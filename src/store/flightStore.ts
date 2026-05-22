@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { Database } from '@/types/supabase'
-
-type Flight = any // Replace with Database['public']['Tables']['flights']['Row']
+import type { Flight } from '@/types/supabase'
 
 interface SearchQuery {
   origin: string
