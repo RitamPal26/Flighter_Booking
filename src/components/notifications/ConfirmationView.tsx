@@ -8,9 +8,15 @@ import { CircleCheckIcon } from "lucide-react"
 
 export default function ConfirmationView() {
   const selectedFlight = useFlightStore((state) => state.selectedFlight)
+  const bookingResult = useFlightStore((state) => state.bookingResult)
+  const selectedSeatId = useFlightStore((state) => state.selectedSeatId)
+  const passengerData = useFlightStore((state) => state.passengerData)
   const resetBooking = useFlightStore((state) => state.resetBooking)
 
   if (!selectedFlight) return null
+
+  const basePrice = selectedFlight.base_price
+  const extraFee = bookingResult ? bookingResult.totalPrice - basePrice : 0
 
   return (
     <div className="p-6 md:p-12 max-w-2xl mx-auto space-y-6 animate-in fade-in duration-500">
@@ -28,9 +34,11 @@ export default function ConfirmationView() {
             <span className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
               E-Ticket
             </span>
-            <span className="text-xs text-muted-foreground">
-              Boarding pass available at check-in
-            </span>
+            {bookingResult && (
+              <span className="text-xs font-mono font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded">
+                {bookingResult.pnrCode}
+              </span>
+            )}
           </div>
 
           <div className="space-y-2 text-sm">
@@ -60,11 +68,36 @@ export default function ConfirmationView() {
                 {formatTime(selectedFlight.arrives_at)}
               </span>
             </div>
-            <div className="flex justify-between border-t pt-2">
-              <span className="text-muted-foreground">Amount Paid</span>
-              <span className="font-bold text-lg">
-                {formatCurrency(selectedFlight.base_price)}
-              </span>
+            {selectedSeatId && bookingResult && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Seat</span>
+                <span className="font-medium">
+                  {bookingResult.seatNumber} &middot;{" "}
+                  <span className="capitalize">{bookingResult.seatClass}</span>
+                </span>
+              </div>
+            )}
+            {passengerData && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Passenger</span>
+                <span className="font-medium">{passengerData.fullName}</span>
+              </div>
+            )}
+            <div className="border-t pt-3 space-y-1">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Base fare</span>
+                <span>{formatCurrency(basePrice)}</span>
+              </div>
+              {extraFee > 0 && (
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Seat upgrade fee</span>
+                  <span>{formatCurrency(extraFee)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t pt-1 font-bold text-lg">
+                <span>Total Paid</span>
+                <span>{formatCurrency(bookingResult?.totalPrice ?? basePrice)}</span>
+              </div>
             </div>
           </div>
         </CardContent>
