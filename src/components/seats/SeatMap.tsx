@@ -2,20 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import { useFlightStore } from "@/store/flightStore";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { flightService } from "@/lib/supabase/queries";
-
-interface Seat {
-  id: string;
-  flight_id: string;
-  seat_number: string;
-  class: "first" | "business" | "economy";
-  is_available: boolean;
-  extra_fee: number;
-}
+import type { Seat } from "@/types/supabase";
 
 export default function SeatMap() {
   const supabase = createClient();
@@ -25,21 +16,6 @@ export default function SeatMap() {
 
   const [seats, setSeats] = useState<Seat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  const router = useRouter();
-
-  const handleContinue = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      router.push("/login");
-      return;
-    }
-
-    useFlightStore.getState().setStep("passenger_details");
-  };
 
   useEffect(() => {
     if (!selectedFlight) return;
@@ -160,11 +136,6 @@ export default function SeatMap() {
           </div>
         </div>
 
-        <div className="mt-8 flex justify-end">
-          <Button size="lg" disabled={!selectedSeatId} onClick={handleContinue}>
-            Continue to Passenger Details
-          </Button>
-        </div>
       </CardContent>
     </Card>
   );
