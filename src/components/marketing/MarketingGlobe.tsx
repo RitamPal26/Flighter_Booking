@@ -47,10 +47,10 @@ function generateArcs() {
 }
 
 export default function MarketingGlobe() {
-  const globeRef = useRef<GlobeMethods | undefined>(undefined)
+  const globeRef = useRef<GlobeMethods>(null!)
 
   useEffect(() => {
-    globeRef.current?.pointOfView?.({ lat: 20, lng: -30, altitude: 2.2 }, 0)
+    globeRef.current.pointOfView({ lat: 20, lng: -30, altitude: 2.2 }, 0)
   }, [])
 
   const arcsData = generateArcs()

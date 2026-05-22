@@ -32,7 +32,7 @@ export default function FlightGlobe({
   originCode,
   destinationCode,
 }: FlightGlobeProps) {
-  const globeRef = useRef<GlobeMethods | undefined>(undefined);
+  const globeRef = useRef<GlobeMethods>(null!);
   const [arcsData, setArcsData] = useState<ArcData[]>([]);
 
   useEffect(() => {
@@ -57,13 +57,13 @@ export default function FlightGlobe({
         midLng += 180;
       }
 
-      globeRef.current?.pointOfView?.(
+      globeRef.current.pointOfView(
         { lat: midLat, lng: midLng, altitude: 2 },
         1500,
       );
     } else {
       setArcsData([]);
-      globeRef.current?.pointOfView?.({ lat: 20, lng: 0, altitude: 2.5 }, 1000);
+      globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 1000);
     }
   }, [originCode, destinationCode]);
 
