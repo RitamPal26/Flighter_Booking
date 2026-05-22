@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Globe from "react-globe.gl";
+import Globe, { type GlobeMethods } from "react-globe.gl";
 
 const AIRPORT_DATA: Record<string, { lat: number; lng: number; name: string }> =
   {
@@ -15,6 +15,14 @@ const AIRPORT_DATA: Record<string, { lat: number; lng: number; name: string }> =
     NRT: { lat: 35.76, lng: 140.38, name: "Tokyo" },
   };
 
+interface ArcData {
+  startLat: number;
+  startLng: number;
+  endLat: number;
+  endLng: number;
+  color: [string, string];
+}
+
 interface FlightGlobeProps {
   originCode: string;
   destinationCode: string;
@@ -24,8 +32,8 @@ export default function FlightGlobe({
   originCode,
   destinationCode,
 }: FlightGlobeProps) {
-  const globeRef = useRef<any>(null);
-  const [arcsData, setArcsData] = useState<any[]>([]);
+  const globeRef = useRef<GlobeMethods | undefined>(undefined);
+  const [arcsData, setArcsData] = useState<ArcData[]>([]);
 
   useEffect(() => {
     const origin = AIRPORT_DATA[originCode];
@@ -49,17 +57,13 @@ export default function FlightGlobe({
         midLng += 180;
       }
 
-      if (globeRef.current) {
-        globeRef.current.pointOfView(
-          { lat: midLat, lng: midLng, altitude: 2 },
-          1500,
-        );
-      }
+      globeRef.current?.pointOfView?.(
+        { lat: midLat, lng: midLng, altitude: 2 },
+        1500,
+      );
     } else {
       setArcsData([]);
-      if (globeRef.current) {
-        globeRef.current.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 1000);
-      }
+      globeRef.current?.pointOfView?.({ lat: 20, lng: 0, altitude: 2.5 }, 1000);
     }
   }, [originCode, destinationCode]);
 

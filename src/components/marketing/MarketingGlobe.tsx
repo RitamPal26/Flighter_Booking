@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
-import Globe from "react-globe.gl"
+import Globe, { type GlobeMethods } from "react-globe.gl"
 
 const AIRPORTS = [
   { lat: 40.64, lng: -73.77, name: "New York" },
@@ -47,12 +47,10 @@ function generateArcs() {
 }
 
 export default function MarketingGlobe() {
-  const globeRef = useRef<any>(null)
+  const globeRef = useRef<GlobeMethods | undefined>(undefined)
 
   useEffect(() => {
-    if (globeRef.current) {
-      globeRef.current.pointOfView({ lat: 20, lng: -30, altitude: 2.2 }, 0)
-    }
+    globeRef.current?.pointOfView?.({ lat: 20, lng: -30, altitude: 2.2 }, 0)
   }, [])
 
   const arcsData = generateArcs()
