@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { flightService } from "@/lib/supabase/queries";
+import LocationAutocomplete from "./LocationAutocomplete"; // Import the new component
 
 export default function SearchForm({
   onResultsFound,
@@ -30,6 +31,14 @@ export default function SearchForm({
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSearching(true);
+
+    if (!origin || !destination) {
+      toast.error("Missing fields", {
+        description: "Please select an origin and destination.",
+      });
+      setIsSearching(false);
+      return;
+    }
 
     setSearchQuery({ origin, destination, date, passengers });
 
@@ -66,20 +75,18 @@ export default function SearchForm({
         >
           <div className="space-y-2">
             <label className="text-sm font-medium">Origin</label>
-            <Input
-              placeholder="e.g., CCU"
+            <LocationAutocomplete
               value={origin}
-              onChange={(e) => setOrigin(e.target.value.toUpperCase())}
-              required
+              onChange={setOrigin}
+              placeholder="Select origin"
             />
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium">Destination</label>
-            <Input
-              placeholder="e.g., DEL"
+            <LocationAutocomplete
               value={destination}
-              onChange={(e) => setDestination(e.target.value.toUpperCase())}
-              required
+              onChange={setDestination}
+              placeholder="Select destination"
             />
           </div>
           <div className="space-y-2">
