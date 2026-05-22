@@ -27,7 +27,7 @@ export default function MarketingLanding() {
               variant="outline"
               className="w-full sm:w-auto px-8 py-6 text-lg bg-white/50 backdrop-blur-sm"
             >
-              Log In
+              Sign In
             </Button>
           </Link>
         </div>
