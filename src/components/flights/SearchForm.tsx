@@ -13,12 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { flightService } from "@/lib/supabase/queries";
-import LocationAutocomplete from "./LocationAutocomplete"; // Import the new component
+import type { Flight } from "@/types/supabase";
+import LocationAutocomplete from "./LocationAutocomplete";
 
 export default function SearchForm({
   onResultsFound,
 }: {
-  onResultsFound: (flights: any[]) => void;
+  onResultsFound: (flights: Flight[]) => void;
 }) {
   const setSearchQuery = useFlightStore((state) => state.setSearchQuery);
 

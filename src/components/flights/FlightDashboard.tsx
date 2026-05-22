@@ -6,6 +6,7 @@ import { useFlightStore } from "@/store/flightStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import type { Flight } from "@/types/supabase";
 import SearchForm from "./SearchForm";
 import SeatMap from "@/components/seats/SeatMap";
 import { formatTime, formatCurrency } from "@/utils/formatters";
@@ -20,14 +21,14 @@ const FlightGlobe = dynamic(() => import("./FlightGlobe"), {
 });
 
 export default function FlightDashboard() {
-  const [flights, setFlights] = useState<any[]>([]);
+  const [flights, setFlights] = useState<Flight[]>([]);
 
   const currentStep = useFlightStore((state) => state.currentStep);
   const searchQuery = useFlightStore((state) => state.searchQuery); // Fetches the live query for the globe
   const setSelectedFlight = useFlightStore((state) => state.setSelectedFlight);
   const resetBooking = useFlightStore((state) => state.resetBooking);
 
-  const handleSelectFlight = (flight: any) => {
+  const handleSelectFlight = (flight: Flight) => {
     setSelectedFlight(flight);
     toast("Flight Selected", {
       description: `Proceeding to seat selection for ${flight.flight_no}.`,
