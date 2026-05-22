@@ -42,7 +42,7 @@ export const useFlightStore = create<FlightState>()(
       passengerData: null,
 
       setSearchQuery: (query) => set({ searchQuery: query, currentStep: 'flight_selection' }),
-      setSelectedFlight: (flight) => set({ selectedFlight: flight, currentStep: 'seat_selection' }),
+      setSelectedFlight: (flight) => set({ selectedFlight: flight, selectedSeatId: null, currentStep: 'seat_selection' }),
       setSelectedSeatId: (seatId) => set({ selectedSeatId: seatId, currentStep: 'passenger_details' }),
       setStep: (step) => set({ currentStep: step }),
       setPassengerData: (data) => set({ passengerData: data, currentStep: 'confirmation' }),

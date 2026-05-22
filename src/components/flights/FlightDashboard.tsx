@@ -9,6 +9,8 @@ import { toast } from "sonner";
 import type { Flight } from "@/types/supabase";
 import SearchForm from "./SearchForm";
 import SeatMap from "@/components/seats/SeatMap";
+import CheckoutDialog from "@/components/checkout/CheckoutDialog";
+import ConfirmationView from "@/components/notifications/ConfirmationView";
 import { formatTime, formatCurrency } from "@/utils/formatters";
 
 const FlightGlobe = dynamic(() => import("./FlightGlobe"), {
@@ -35,13 +37,18 @@ export default function FlightDashboard() {
     });
   };
 
-  if (currentStep === "seat_selection") {
+  if (currentStep === "confirmation") {
+    return <ConfirmationView />;
+  }
+
+  if (currentStep === "seat_selection" || currentStep === "passenger_details") {
     return (
       <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-4 animate-in fade-in duration-500">
         <Button variant="ghost" onClick={resetBooking}>
           &larr; Back to Search
         </Button>
         <SeatMap />
+        <CheckoutDialog />
       </div>
     );
   }
