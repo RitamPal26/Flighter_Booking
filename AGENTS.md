@@ -74,3 +74,42 @@ src/
 2. **Never break atomicity**: Booking a flight is a transaction. Always use Supabase RPCs or combined transactions in services.
 3. **Respect the domain**: Do not leak flight logic into the marketing components or vice versa.
 4. **Style Consistency**: Always use Shadcn UI components over raw HTML elements to maintain theme consistency.
+
+## 7. Completed Feature Implementations
+
+### Task 01 — Search & Booking
+- **PassengerDetailsForm** (`src/components/checkout/PassengerDetailsForm.tsx`): Full passenger details form with name, passport number, nationality (dropdown), and date of birth. Shown at the `passenger_details` step. Saves to `flightStore.passengerData`.
+- **Booking flow updated**: `FlightDashboard` now renders `PassengerDetailsForm` at the `passenger_details` step, `CheckoutDialog` at `confirmation` (pre-payment), and `ConfirmationView` (post-payment).
+- **ConfirmationView upgraded**: Displays PNR code, seat assignment (number + class), passenger name, and a price breakdown showing base fare + seat upgrade fee.
+- **CheckoutDialog updated**: Shows passenger data summary with redacted passport number. Stores full booking result in `flightStore.bookingResult`.
+
+### Task 02 — Seat Selection
+- **Class zone section dividers**: `SeatMap` splits seats by class (first/business/economy) into separate visual zones with colored headers ("First Class · Rows 1–3", etc.).
+- **Row labels**: Each row shows its row number on the left side within the grid.
+- **Color coding**: First = purple-200, Business = sky-200, Economy = stone-100, with matching section header colors and legend.
+
+### Task 03 — Rescheduling & Cancellation
+- **`rescheduleBooking` fixed**: Now properly cancels the old booking, creates a new booking on the new flight/seat, charges a $50 reschedule fee, and records the reschedule in the `reschedules` table.
+- **`cancelBooking` action**: New server action wrapping `cancelBookingTransaction` RPC.
+- **`BookingsClient`** (`src/app/bookings/BookingsClient.tsx`): Client component with cancel button, loading state, and confirmation dialog.
+- **`ConfirmDialog`** (`src/components/shared/ConfirmDialog.tsx`): Reusable confirmation modal using the existing `Dialog` component, supports loading state and destructive variant.
+
+### Task 04 — Zustand Stores
+- **`bookingResult` in `flightStore`**: Stores `{ bookingId, pnrCode, seatNumber, seatClass, totalPrice }` after successful booking for display in `ConfirmationView`.
+- **`cachedBookings` in `userStore`**: Array of `CachedBooking` objects persisted alongside session token.
+- **`logout()` now resets booking state**: Calls `useFlightStore.getState().resetBooking()` to clear flight selection on logout.
+- **Optimistic seat selection**: `SeatMap` sets `pendingSeatId` on click (yellow pulse), finalizes after 400ms. Realtime subscription rolls back if the seat becomes unavailable.
+
+### Task 05 — PWA
+- **`public/manifest.json`**: Full PWA manifest with `standalone` display, blue theme color, icon references.
+- **`public/icons/`**: SVG app icons (192x192 and 512x512) with blue "F" logo.
+- **`public/sw.js`**: Service worker with app shell caching and offline fallback to `/offline`.
+- **`src/app/offline/page.tsx`**: Offline fallback page with "You're Offline" message.
+- **`InstallPrompt`** (`src/components/shared/InstallPrompt.tsx`): Handles `beforeinstallprompt` event, shows install banner at bottom of screen.
+- **`ServiceWorkerRegister`** (`src/components/shared/ServiceWorkerRegister.tsx`): Registers `sw.js` on mount.
+- **`layout.tsx`**: Updated metadata (title, description, manifest, apple-web-app), separate `viewport` export with `themeColor`.
+- **`next.config.ts`**: Added `Cache-Control` headers for `sw.js`.
+
+### Infrastructure fixes
+- **`middleware.ts`**: Fixed auth route paths from `/login` to `/signin`.
+- **`src/lib/supabase/booking.ts`**: Fixed RPC call from non-existent `create_booking_transaction` to `book_seat` with required params.

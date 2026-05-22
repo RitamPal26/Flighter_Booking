@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image"; // IMPORT NEXT.JS IMAGE COMPONENT
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -39,9 +40,13 @@ export default function Navbar() {
     <nav className="border-b bg-white/80 backdrop-blur-md sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">F</span>
-          </div>
+          <Image 
+            src="/FlyingBird.png" 
+            alt="FlyingBird Logo" 
+            width={32} 
+            height={32} 
+            className="object-contain"
+          />
           <span className="font-bold text-xl tracking-tight">FlyingBird</span>
         </Link>
 

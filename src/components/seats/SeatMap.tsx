@@ -91,10 +91,10 @@ export default function SeatMap() {
       return "bg-gray-300 text-gray-500 cursor-not-allowed opacity-50";
 
     if (seat.class === "first")
-      return "bg-purple-100 hover:bg-purple-200 border-purple-300";
+      return "bg-purple-200 hover:bg-purple-300 border-purple-400 text-purple-900";
     if (seat.class === "business")
-      return "bg-blue-100 hover:bg-blue-200 border-blue-300";
-    return "bg-white hover:bg-gray-100 border-gray-200";
+      return "bg-sky-200 hover:bg-sky-300 border-sky-400 text-sky-900";
+    return "bg-stone-100 hover:bg-stone-200 border-stone-300 text-stone-800";
   };
 
   const classLabel: Record<string, string> = {
@@ -104,9 +104,9 @@ export default function SeatMap() {
   }
 
   const classTheme: Record<string, string> = {
-    first: "border-purple-300 bg-purple-50 text-purple-800",
-    business: "border-blue-300 bg-blue-50 text-blue-800",
-    economy: "border-gray-200 bg-gray-50 text-gray-700",
+    first: "border-purple-400 bg-purple-100 text-purple-900",
+    business: "border-sky-400 bg-sky-100 text-sky-900",
+    economy: "border-stone-300 bg-stone-100 text-stone-800",
   }
 
   const colHeaders = ["A", "B", "C", "", "D", "E", "F"]
@@ -129,13 +129,13 @@ export default function SeatMap() {
       <CardContent>
         <div className="flex gap-4 mb-8 text-sm justify-center flex-wrap">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-purple-100 border rounded"></div> First
+            <div className="w-4 h-4 bg-purple-300 border border-purple-400 rounded"></div> First
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-100 border rounded"></div> Business
+            <div className="w-4 h-4 bg-sky-300 border border-sky-400 rounded"></div> Business
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-white border rounded"></div> Economy
+            <div className="w-4 h-4 bg-stone-200 border border-stone-300 rounded"></div> Economy
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-green-500 rounded"></div> Selected
