@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const PROTECTED_ROUTES = ['/bookings']
-const AUTH_ROUTES = ['/login', '/signup']
+const AUTH_ROUTES = ['/signin', '/signup']
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request: { headers: request.headers } })
@@ -31,7 +31,7 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = AUTH_ROUTES.some((route) => path.startsWith(route))
 
   if (!user && isProtectedRoute) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    return NextResponse.redirect(new URL('/signin', request.url))
   }
 
   if (user && isAuthRoute) {
