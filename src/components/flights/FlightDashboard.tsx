@@ -10,6 +10,7 @@ import type { Flight } from "@/types/supabase";
 import SearchForm from "./SearchForm";
 import SeatMap from "@/components/seats/SeatMap";
 import CheckoutDialog from "@/components/checkout/CheckoutDialog";
+import PassengerDetailsForm from "@/components/checkout/PassengerDetailsForm";
 import ConfirmationView from "@/components/notifications/ConfirmationView";
 import { formatTime, formatCurrency } from "@/utils/formatters";
 
@@ -26,9 +27,10 @@ export default function FlightDashboard() {
   const [flights, setFlights] = useState<Flight[]>([]);
 
   const currentStep = useFlightStore((state) => state.currentStep);
-  const searchQuery = useFlightStore((state) => state.searchQuery); // Fetches the live query for the globe
+  const searchQuery = useFlightStore((state) => state.searchQuery);
   const setSelectedFlight = useFlightStore((state) => state.setSelectedFlight);
   const resetBooking = useFlightStore((state) => state.resetBooking);
+  const bookingResult = useFlightStore((state) => state.bookingResult);
 
   const handleSelectFlight = (flight: Flight) => {
     setSelectedFlight(flight);
@@ -38,17 +40,37 @@ export default function FlightDashboard() {
   };
 
   if (currentStep === "confirmation") {
-    return <ConfirmationView />;
+    if (bookingResult) {
+      return <ConfirmationView />;
+    }
+    return (
+      <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-4 animate-in fade-in duration-500">
+        <Button variant="ghost" onClick={resetBooking}>
+          &larr; Back to Search
+        </Button>
+        <CheckoutDialog />
+      </div>
+    );
   }
 
-  if (currentStep === "seat_selection" || currentStep === "passenger_details") {
+  if (currentStep === "seat_selection") {
     return (
       <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-4 animate-in fade-in duration-500">
         <Button variant="ghost" onClick={resetBooking}>
           &larr; Back to Search
         </Button>
         <SeatMap />
-        <CheckoutDialog />
+      </div>
+    );
+  }
+
+  if (currentStep === "passenger_details") {
+    return (
+      <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-4 animate-in fade-in duration-500">
+        <Button variant="ghost" onClick={resetBooking}>
+          &larr; Back to Search
+        </Button>
+        <PassengerDetailsForm />
       </div>
     );
   }
