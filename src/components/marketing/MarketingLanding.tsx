@@ -24,7 +24,7 @@ export default function MarketingLanding() {
           <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold tracking-tight text-white mb-6 leading-tight">
             Your journey begins with{" "}
             <span className="bg-gradient-to-r from-blue-300 via-blue-400 to-cyan-300 bg-clip-text text-transparent">
-              Flighter.
+              FlyingBird.
             </span>
           </h1>
 
@@ -77,7 +77,7 @@ export default function MarketingLanding() {
         <div className="max-w-7xl mx-auto relative">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Why choose Flighter?
+              Why choose FlyingBird?
             </h2>
             <p className="text-gray-500 max-w-xl mx-auto">
               Built for modern travelers who value speed, transparency, and
@@ -182,7 +182,7 @@ export default function MarketingLanding() {
           </h2>
           <p className="text-blue-200/80 mb-8 max-w-xl mx-auto text-lg leading-relaxed">
             Join thousands of travelers who have upgraded their booking
-            experience with Flighter.
+            experience with FlyingBird.
           </p>
           <Link href="/signup">
             <Button

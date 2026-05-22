@@ -46,7 +46,7 @@ export default function SignUpPage() {
       toast.error("Sign Up Failed", { description: error.message });
     } else {
       toast.success("Account created!", {
-        description: "Welcome to Flighter.",
+        description: "Welcome to FlyingBird.",
       });
       router.push("/");
     }
@@ -62,7 +62,7 @@ export default function SignUpPage() {
             Create an Account
           </CardTitle>
           <CardDescription>
-            Join Flighter to book your next journey.
+            Join FlyingBird to book your next journey.
           </CardDescription>
         </CardHeader>
         <CardContent>

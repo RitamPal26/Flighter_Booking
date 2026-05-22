@@ -47,7 +47,7 @@ export default function SignInPage() {
       <Card className="w-full max-w-md shadow-lg border-0">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-          <CardDescription>Sign in to your Flighter account.</CardDescription>
+          <CardDescription>Sign in to your FlyingBird account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">

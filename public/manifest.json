@@ -1,6 +1,6 @@
 {
-  "name": "Flighter",
-  "short_name": "Flighter",
+  "name": "FlyingBird",
+  "short_name": "FlyingBird",
   "description": "Book flights instantly with real-time seat availability",
   "start_url": "/",
   "display": "standalone",

@@ -42,7 +42,7 @@ export default function InstallPrompt() {
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:bottom-4 md:max-w-sm z-50 bg-white border rounded-xl shadow-lg p-4 space-y-3 animate-in slide-in-from-bottom-4 duration-300">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-semibold text-sm">Install Flighter</p>
+          <p className="font-semibold text-sm">Install FlyingBird</p>
           <p className="text-xs text-muted-foreground">
             Add to your home screen for a faster experience.
           </p>

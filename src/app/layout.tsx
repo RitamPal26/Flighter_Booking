@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     title: "FlyingBird",
   },
   icons: [
-    { rel: "icon", url: "/favicon.ico" },
+    { rel: "icon", url: "/FlyingBird.png" },
     {
       rel: "apple-touch-icon",
       url: "/icons/icon-192x192.svg",

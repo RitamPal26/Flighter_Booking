@@ -1,10 +1,10 @@
-# Flighter Agent Development Guidelines
+# FlyingBird Agent Development Guidelines
 
-This document serves as the ground truth for agents developing, maintaining, or refactoring the **Flighter** application.
+This document serves as the ground truth for agents developing, maintaining, or refactoring the **FlyingBird** application.
 
 ## 1. Architectural Philosophy: The Modular Monolith
 
-Flighter is built as a **Modular Monolith**. We prioritize domain-driven separation while maintaining the ease of a unified repository.
+FlyingBird is built as a **Modular Monolith**. We prioritize domain-driven separation while maintaining the ease of a unified repository.
 
 * **Domain Isolation**: Code is organized by business capability (e.g., `flights`, `seats`, `marketing`, `auth`).
 * **Strict Boundaries**: Modules communicate through defined service layers, not direct database access.
