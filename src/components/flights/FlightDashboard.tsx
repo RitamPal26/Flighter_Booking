@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useFlightStore } from "@/store/flightStore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,9 +10,20 @@ import SearchForm from "./SearchForm";
 import SeatMap from "@/components/seats/SeatMap";
 import { formatTime, formatCurrency } from "@/utils/formatters";
 
+const FlightGlobe = dynamic(() => import("./FlightGlobe"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[400px] bg-slate-900 rounded-xl animate-pulse flex items-center justify-center text-slate-500">
+      Loading Map...
+    </div>
+  ),
+});
+
 export default function FlightDashboard() {
   const [flights, setFlights] = useState<any[]>([]);
+
   const currentStep = useFlightStore((state) => state.currentStep);
+  const searchQuery = useFlightStore((state) => state.searchQuery); // Fetches the live query for the globe
   const setSelectedFlight = useFlightStore((state) => state.setSelectedFlight);
   const resetBooking = useFlightStore((state) => state.resetBooking);
 
@@ -34,17 +46,29 @@ export default function FlightDashboard() {
   }
 
   return (
-    <div className="p-6 md:p-12 max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
-      <div className="text-center space-y-2">
-        <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-          Find Your Flight
-        </h1>
-        <p className="text-gray-500">
-          Search and book flights instantly with real-time seat availability.
-        </p>
-      </div>
+    <div className="p-6 md:p-12 max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 xl:gap-12">
+        <div className="h-auto lg:h-[400px] flex flex-col justify-center space-y-6">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+              Find Your Flight
+            </h1>
+            <p className="text-gray-500">
+              Search and book flights instantly with real-time seat
+              availability.
+            </p>
+          </div>
 
-      <SearchForm onResultsFound={setFlights} />
+          <SearchForm onResultsFound={setFlights} />
+        </div>
+
+        <div className="hidden lg:block h-[400px] w-full">
+          <FlightGlobe
+            originCode={searchQuery?.origin || ""}
+            destinationCode={searchQuery?.destination || ""}
+          />
+        </div>
+      </div>
 
       {flights.length > 0 && (
         <div className="space-y-4">

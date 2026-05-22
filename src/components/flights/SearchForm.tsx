@@ -69,9 +69,10 @@ export default function SearchForm({
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* CHANGED: md:grid-cols-4 to sm:grid-cols-2 */}
         <form
           onSubmit={handleSearch}
-          className="grid grid-cols-1 md:grid-cols-4 gap-4"
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
         >
           <div className="space-y-2">
             <label className="text-sm font-medium">Origin</label>
@@ -109,11 +110,12 @@ export default function SearchForm({
               required
             />
           </div>
-          <div className="md:col-span-4 flex justify-end mt-4">
+          {/* CHANGED: md:col-span-4 to sm:col-span-2 so the button spans full width */}
+          <div className="sm:col-span-2 flex justify-end mt-4">
             <Button
               type="submit"
               disabled={isSearching}
-              className="w-full md:w-auto px-8"
+              className="w-full sm:w-auto px-8"
             >
               {isSearching ? "Searching..." : "Search Flights"}
             </Button>
