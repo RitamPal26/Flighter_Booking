@@ -98,8 +98,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 | Field | Value |
 |---|---|
-| Email | `test@example.com` |
-| Password | `password123` |
+| Email | `ritamjunior26@gmail.com` |
+| Password | `12345678` |
 
 ---
 
