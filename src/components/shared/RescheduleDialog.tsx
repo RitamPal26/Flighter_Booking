@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -24,6 +24,7 @@ interface BookingInfo {
   pnr_code: string
   total_price: number
   flights: {
+    id: string
     flight_no: string
     origin: string
     destination: string
@@ -55,11 +56,14 @@ export default function RescheduleDialog({
   const [isLoadingFlights, setIsLoadingFlights] = useState(false)
   const [isLoadingSeats, setIsLoadingSeats] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const searchReqId = useRef(0)
 
   useEffect(() => {
     if (!open) return
-    const today = new Date()
-    const defaultDate = today.toISOString().slice(0, 10)
+    searchReqId.current += 1
+    const defaultDate = booking.flights?.departs_at
+      ? new Date(booking.flights.departs_at).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10)
     setDate(defaultDate)
     setStep("select_flight")
     setSelectedFlight(null)
@@ -70,17 +74,35 @@ export default function RescheduleDialog({
 
   const handleSearch = async () => {
     if (!date || !booking.flights) return
+    const reqId = ++searchReqId.current
     setIsLoadingFlights(true)
     const { data, error } = await flightService.searchFlightsByDate(
       booking.flights.origin,
       booking.flights.destination,
       date,
     )
-    if (!error && data) {
+    if (reqId !== searchReqId.current) { setIsLoadingFlights(false); return }
+    if (error) {
+      console.error("Flight search error:", error)
+      toast.error("Search failed", { description: error.message })
+      setIsLoadingFlights(false)
+      return
+    }
+    if (data) {
       const now = Date.now()
-      const eligible = (data as Flight[]).filter(
-        (f) => new Date(f.departs_at).getTime() - now > 2 * 60 * 60 * 1000,
-      )
+      const dayStart = new Date(`${date}T00:00:00Z`).getTime()
+      const dayEnd = new Date(`${date}T23:59:59Z`).getTime()
+      const eligible = (data as Flight[]).filter((f) => {
+        const depTime = new Date(f.departs_at).getTime()
+        if (isNaN(depTime)) return false
+        return (
+          f.id !== booking.flights?.id &&
+          depTime >= dayStart &&
+          depTime <= dayEnd &&
+          depTime - now > 2 * 60 * 60 * 1000
+        )
+      })
+      if (reqId !== searchReqId.current) { setIsLoadingFlights(false); return }
       setFlights(eligible)
     }
     setIsLoadingFlights(false)

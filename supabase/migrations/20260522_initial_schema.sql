@@ -93,6 +93,7 @@ CREATE OR REPLACE FUNCTION book_seat(
 ) RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_booking_id UUID;
@@ -126,6 +127,7 @@ CREATE OR REPLACE FUNCTION cancel_booking(
 ) RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_seat_id UUID;
@@ -150,7 +152,10 @@ $$;
 
 -- 4. DB-Level Constraint (Trigger): Prevent cancellation within 2 hours of departure
 CREATE OR REPLACE FUNCTION enforce_cancellation_window()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
 DECLARE
     v_departs_at TIMESTAMPTZ;
 BEGIN
@@ -163,9 +168,15 @@ BEGIN
     END IF;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER check_cancellation_window
 BEFORE UPDATE ON bookings
 FOR EACH ROW
 EXECUTE FUNCTION enforce_cancellation_window();
+
+-- 5. Restrict SECURITY DEFINER RPC execution to authenticated users only
+REVOKE EXECUTE ON FUNCTION book_seat(UUID, UUID, UUID, NUMERIC, TEXT) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION cancel_booking(UUID) FROM anon, public;
+GRANT EXECUTE ON FUNCTION book_seat(UUID, UUID, UUID, NUMERIC, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION cancel_booking(UUID) TO authenticated;

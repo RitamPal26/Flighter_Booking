@@ -5,6 +5,7 @@ import { processPayment } from '@/lib/services/paymentService';
 import {
   createBookingTransaction,
   cancelBookingTransaction,
+  rescheduleBookingTransaction,
 } from '@/lib/services/bookingService';
 
 interface SeatInfo {
@@ -94,43 +95,42 @@ export async function rescheduleBooking(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { success: false as const, error: 'Not authenticated' };
 
-  const { data: oldBooking, error: fetchError } = await supabase
-    .from('bookings')
-    .select('*, flights(*)')
-    .eq('id', bookingId)
+  const rescheduleFee = 50;
+
+  const { data: newSeat, error: seatError } = await supabase
+    .from('seats')
+    .select('extra_fee')
+    .eq('id', newSeatId)
     .single();
 
-  if (fetchError || !oldBooking) {
-    return { success: false as const, error: 'Booking not found' };
+  if (seatError || !newSeat) {
+    return { success: false as const, error: 'New seat not found' };
   }
 
-  const { error: cancelError } = await cancelBookingTransaction(bookingId);
-  if (cancelError) return { success: false as const, error: cancelError.message };
+  const { data: newFlight, error: flightError } = await supabase
+    .from('flights')
+    .select('base_price')
+    .eq('id', newFlightId)
+    .single();
 
-  const rescheduleFee = 50;
-  const newTotalPrice = oldBooking.total_price + rescheduleFee;
+  if (flightError || !newFlight) {
+    return { success: false as const, error: 'New flight not found' };
+  }
+
+  const newTotalPrice = newFlight.base_price + newSeat.extra_fee + rescheduleFee;
   const newPnrCode = `PNR${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
-  const { data, error: bookError } = await createBookingTransaction(
+  const { data, error } = await rescheduleBookingTransaction(
+    bookingId,
     newFlightId,
     newSeatId,
     user.id,
-    newTotalPrice,
     newPnrCode,
+    newTotalPrice,
+    rescheduleFee,
   );
 
-  if (bookError) return { success: false as const, error: bookError.message };
-
-  try {
-    await supabase.from('reschedules').insert({
-      booking_id: bookingId,
-      old_flight_id: oldBooking.flight_id,
-      new_flight_id: newFlightId,
-      fee_charged: rescheduleFee,
-    });
-  } catch {
-    console.error('Failed to record reschedule history');
-  }
+  if (error) return { success: false as const, error: error.message };
 
   return {
     success: true as const,
@@ -145,7 +145,13 @@ export async function cancelBooking(bookingId: string) {
   if (!user) return { success: false as const, error: 'Not authenticated' };
 
   const { error } = await cancelBookingTransaction(bookingId);
-  if (error) return { success: false as const, error: error.message };
+  if (error) {
+    const msg = error.message ?? 'Unknown error';
+    if (msg.includes('within 2 hours') || msg.includes('2 hours')) {
+      return { success: false as const, error: 'Your flight is within 2 hours of departure. Cancellation is not permitted at this time.' };
+    }
+    return { success: false as const, error: msg };
+  }
 
   return { success: true as const };
 }

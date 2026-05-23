@@ -29,3 +29,27 @@ export async function cancelBookingTransaction(bookingId: string) {
 
   return { data, error };
 }
+
+export async function rescheduleBookingTransaction(
+  bookingId: string,
+  newFlightId: string,
+  newSeatId: string,
+  userId: string,
+  newPnrCode: string,
+  newTotalPrice: number,
+  rescheduleFee: number,
+) {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.rpc('reschedule_booking', {
+    p_booking_id: bookingId,
+    p_new_flight_id: newFlightId,
+    p_new_seat_id: newSeatId,
+    p_user_id: userId,
+    p_new_pnr_code: newPnrCode,
+    p_new_total_price: newTotalPrice,
+    p_reschedule_fee: rescheduleFee,
+  });
+
+  return { data, error };
+}

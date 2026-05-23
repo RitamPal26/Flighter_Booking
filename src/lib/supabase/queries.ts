@@ -28,17 +28,13 @@ export const flightService = {
       .order('departs_at', { ascending: true })
   },
 
-  async searchFlightsByDate(origin: string, destination: string, date: string) {
+  async searchFlightsByDate(origin: string, destination: string, _date?: string) {
     const supabase = createClient()
-    const startOfDay = `${date}T00:00:00Z`
-    const endOfDay = `${date}T23:59:59Z`
     return await supabase
       .from('flights')
       .select('*')
-      .eq('origin', origin)
-      .eq('destination', destination)
-      .gte('departs_at', startOfDay)
-      .lte('departs_at', endOfDay)
+      .ilike('origin', `%${origin}%`)
+      .ilike('destination', `%${destination}%`)
       .order('departs_at', { ascending: true })
   }
 }
