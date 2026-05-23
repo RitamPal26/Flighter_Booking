@@ -7,12 +7,7 @@ const AIRPORT_DATA: Record<string, { lat: number; lng: number; name: string }> =
   {
     CCU: { lat: 22.65, lng: 88.44, name: "Kolkata" },
     DEL: { lat: 28.55, lng: 77.1, name: "New Delhi" },
-    JFK: { lat: 40.64, lng: -73.77, name: "New York" },
-    LHR: { lat: 51.47, lng: -0.45, name: "London" },
-    DXB: { lat: 25.25, lng: 55.36, name: "Dubai" },
     BOM: { lat: 19.09, lng: 72.86, name: "Mumbai" },
-    SFO: { lat: 37.61, lng: -122.37, name: "San Francisco" },
-    NRT: { lat: 35.76, lng: 140.38, name: "Tokyo" },
   };
 
 interface ArcData {

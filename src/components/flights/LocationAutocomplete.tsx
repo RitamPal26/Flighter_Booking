@@ -21,12 +21,7 @@ import {
 const AIRPORTS = [
   { value: "CCU", label: "Kolkata (CCU)" },
   { value: "DEL", label: "New Delhi (DEL)" },
-  { value: "JFK", label: "New York (JFK)" },
-  { value: "LHR", label: "London (LHR)" },
-  { value: "DXB", label: "Dubai (DXB)" },
   { value: "BOM", label: "Mumbai (BOM)" },
-  { value: "SFO", label: "San Francisco (SFO)" },
-  { value: "NRT", label: "Tokyo (NRT)" },
 ];
 
 interface LocationAutocompleteProps {

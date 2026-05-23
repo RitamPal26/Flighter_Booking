@@ -68,7 +68,7 @@ export default function SearchForm({
       onResultsFound(data || []);
       if (data?.length === 0)
         toast("No flights found", {
-          description: "Try CCU to DEL or JFK to LHR.",
+          description: "Try DEL to BOM or CCU to DEL.",
         });
     }
 
