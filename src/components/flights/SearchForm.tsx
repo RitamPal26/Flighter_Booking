@@ -46,6 +46,7 @@ export default function SearchForm({
     const { data, error } = await flightService.searchFlights(
       origin,
       destination,
+      date || undefined,
     );
 
     if (error) {

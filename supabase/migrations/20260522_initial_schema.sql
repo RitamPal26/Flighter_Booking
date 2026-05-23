@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Tables
-CREATE TABLE flights (
+CREATE TABLE IF NOT EXISTS flights (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     flight_no TEXT NOT NULL,
     origin TEXT NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE flights (
     base_price NUMERIC NOT NULL
 );
 
-CREATE TABLE seats (
+CREATE TABLE IF NOT EXISTS seats (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     flight_id UUID REFERENCES flights(id) ON DELETE CASCADE,
     seat_number TEXT NOT NULL,
@@ -24,7 +24,7 @@ CREATE TABLE seats (
     UNIQUE(flight_id, seat_number)
 );
 
-CREATE TABLE bookings (
+CREATE TABLE IF NOT EXISTS bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
     flight_id UUID REFERENCES flights(id) ON DELETE CASCADE,
@@ -35,7 +35,7 @@ CREATE TABLE bookings (
     pnr_code TEXT NOT NULL UNIQUE
 );
 
-CREATE TABLE passengers (
+CREATE TABLE IF NOT EXISTS passengers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
     full_name TEXT NOT NULL,
@@ -44,7 +44,7 @@ CREATE TABLE passengers (
     dob DATE NOT NULL
 );
 
-CREATE TABLE reschedules (
+CREATE TABLE IF NOT EXISTS reschedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
     old_flight_id UUID REFERENCES flights(id) ON DELETE CASCADE,
@@ -61,27 +61,27 @@ ALTER TABLE passengers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reschedules ENABLE ROW LEVEL SECURITY;
 
 -- Public read access for flights and seats
-CREATE POLICY "Flights are viewable by everyone" ON flights FOR SELECT USING (true);
-CREATE POLICY "Seats are viewable by everyone" ON seats FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Flights are viewable by everyone" ON flights FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Seats are viewable by everyone" ON seats FOR SELECT USING (true);
 
 -- Users can only access their own bookings and related data
 -- (select auth.uid()) is used instead of auth.uid() for initplan optimization —
 -- it evaluates once per query rather than once per row
-CREATE POLICY "Users can view their own bookings" ON bookings FOR SELECT USING ((select auth.uid()) = user_id);
-CREATE POLICY "Users can insert their own bookings" ON bookings FOR INSERT WITH CHECK ((select auth.uid()) = user_id);
-CREATE POLICY "Users can update their own bookings" ON bookings FOR UPDATE USING ((select auth.uid()) = user_id);
+CREATE POLICY IF NOT EXISTS "Users can view their own bookings" ON bookings FOR SELECT USING ((select auth.uid()) = user_id);
+CREATE POLICY IF NOT EXISTS "Users can insert their own bookings" ON bookings FOR INSERT WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY IF NOT EXISTS "Users can update their own bookings" ON bookings FOR UPDATE USING ((select auth.uid()) = user_id);
 
-CREATE POLICY "Users can view their passengers" ON passengers FOR SELECT USING (
+CREATE POLICY IF NOT EXISTS "Users can view their passengers" ON passengers FOR SELECT USING (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = (select auth.uid()))
 );
-CREATE POLICY "Users can insert passengers" ON passengers FOR INSERT WITH CHECK (
+CREATE POLICY IF NOT EXISTS "Users can insert passengers" ON passengers FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = (select auth.uid()))
 );
 
-CREATE POLICY "Users can view their reschedules" ON reschedules FOR SELECT USING (
+CREATE POLICY IF NOT EXISTS "Users can view their reschedules" ON reschedules FOR SELECT USING (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = (select auth.uid()))
 );
-CREATE POLICY "Users can insert reschedules" ON reschedules FOR INSERT WITH CHECK (
+CREATE POLICY IF NOT EXISTS "Users can insert reschedules" ON reschedules FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = (select auth.uid()))
 );
 
@@ -172,6 +172,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS check_cancellation_window ON bookings;
 CREATE TRIGGER check_cancellation_window
 BEFORE UPDATE ON bookings
 FOR EACH ROW

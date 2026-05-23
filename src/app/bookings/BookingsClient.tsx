@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import ConfirmDialog from "@/components/shared/ConfirmDialog"
 import RescheduleDialog from "@/components/shared/RescheduleDialog"
+import { formatInTimeZone } from "date-fns-tz"
 import { formatCurrency, formatTime } from "@/utils/formatters"
 import { toast } from "sonner"
 import { cancelBooking } from "@/app/actions/bookingActions"
@@ -126,7 +127,7 @@ export default function BookingsClient({
 
                         <p className="text-sm text-gray-500">
                           {flight
-                            ? `${new Date(flight.departs_at).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}  ${formatTime(flight.departs_at)} - ${formatTime(flight.arrives_at)}`
+                            ? `${formatInTimeZone(flight.departs_at, 'UTC', 'MMM d, yyyy')}  ${formatTime(flight.departs_at)} - ${formatTime(flight.arrives_at)}`
                             : "Flight info unavailable"}
                         </p>
                       </div>
@@ -146,7 +147,7 @@ export default function BookingsClient({
                         </span>
                         <span className="text-xs text-gray-400">
                           Booked{" "}
-                          {new Date(booking.booked_at).toLocaleDateString()}
+                          {formatInTimeZone(booking.booked_at, 'UTC', 'MMM d, yyyy')}
                         </span>
                       </div>
                     </div>

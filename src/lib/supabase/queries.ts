@@ -1,14 +1,21 @@
 import { createClient } from './client'
 
 export const flightService = {
-  async searchFlights(origin: string, destination: string) {
+  async searchFlights(origin: string, destination: string, date?: string) {
     const supabase = createClient()
-    return await supabase
+    let query = supabase
       .from('flights')
       .select('*')
       .ilike('origin', `%${origin}%`)
       .ilike('destination', `%${destination}%`)
-      .order('departs_at', { ascending: true })
+
+    if (date) {
+      const dayStart = `${date}T00:00:00Z`
+      const dayEnd = `${date}T23:59:59Z`
+      query = query.gte('departs_at', dayStart).lte('departs_at', dayEnd)
+    }
+
+    return await query.order('departs_at', { ascending: true })
   },
 
   async getCabinMap(flightId: string) {

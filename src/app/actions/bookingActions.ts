@@ -118,6 +118,10 @@ export async function rescheduleBooking(
   }
 
   const newTotalPrice = newFlight.base_price + newSeat.extra_fee + rescheduleFee;
+
+  const paymentResult = await processPayment(newTotalPrice);
+  if (!paymentResult.success) return paymentResult;
+
   const newPnrCode = `PNR${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
   const { data, error } = await rescheduleBookingTransaction(

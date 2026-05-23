@@ -1,5 +1,7 @@
+import { formatInTimeZone } from 'date-fns-tz'
+
 export const formatTime = (isoString: string): string => {
-  return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
+  return formatInTimeZone(isoString, 'UTC', 'HH:mm')
 }
 
 export const formatCurrency = (amount: number): string => {
@@ -7,10 +9,5 @@ export const formatCurrency = (amount: number): string => {
 }
 
 export const formatDate = (isoString: string): string => {
-  return new Date(isoString).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  })
+  return formatInTimeZone(isoString, 'UTC', 'MMM d, yyyy')
 }

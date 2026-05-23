@@ -2,6 +2,27 @@ const { Client } = require('pg')
 const fs = require('fs')
 const path = require('path')
 
+const MIGRATIONS_DIR = path.join(__dirname, '..', 'supabase', 'migrations')
+
+async function applyMigrations(client) {
+  const files = [
+    '20260522_initial_schema.sql',
+    '20260523_fix_reschedule_atomicity.sql',
+    '20260523_schema_qualify_functions.sql',
+  ]
+
+  for (const file of files) {
+    const filePath = path.join(MIGRATIONS_DIR, file)
+    if (!fs.existsSync(filePath)) {
+      console.log(`  Skipping ${file} (not found)`)
+      continue
+    }
+    const sql = fs.readFileSync(filePath, 'utf8')
+    console.log(`  Applying ${file}...`)
+    await client.query(sql)
+  }
+}
+
 async function main() {
   const password = process.env.SUPABASE_PASSWORD
   const host = 'db.eifdxmjrahjodtchrloz.supabase.co'
@@ -14,21 +35,11 @@ async function main() {
   await client.query('BEGIN')
 
   try {
-    // Disable the trigger temporarily so we can delete without firing
-    await client.query('ALTER TABLE bookings DISABLE TRIGGER check_cancellation_window')
+    // Apply all migrations first (ensure schema + RPCs are current)
+    console.log('Applying migrations...')
+    await applyMigrations(client)
 
-    // Delete in reverse FK order
-    console.log('Clearing existing data...')
-    await client.query('DELETE FROM reschedules')
-    await client.query('DELETE FROM passengers')
-    await client.query('DELETE FROM bookings')
-    await client.query('DELETE FROM seats')
-    await client.query('DELETE FROM flights')
-
-    // Re-enable trigger
-    await client.query('ALTER TABLE bookings ENABLE TRIGGER check_cancellation_window')
-
-    // Read and execute seed.sql
+    // Run seed.sql (handles clearing + populating data)
     console.log('Running seed.sql...')
     const seedSql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'seed.sql'), 'utf8')
     await client.query(seedSql)

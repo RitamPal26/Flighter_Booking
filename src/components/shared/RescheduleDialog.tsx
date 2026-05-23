@@ -14,6 +14,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { flightService } from "@/lib/supabase/queries";
 import { rescheduleBooking } from "@/app/actions/bookingActions";
+import { format, parseISO } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { formatCurrency, formatTime } from "@/utils/formatters";
 import { toast } from "sonner";
 import { Loader2Icon } from "lucide-react";
@@ -62,8 +64,8 @@ export default function RescheduleDialog({
     if (!open) return;
     searchReqId.current += 1;
     const defaultDate = booking.flights?.departs_at
-      ? new Date(booking.flights.departs_at).toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+      ? formatInTimeZone(booking.flights.departs_at, 'UTC', 'yyyy-MM-dd')
+      : format(new Date(), 'yyyy-MM-dd');
     setDate(defaultDate);
     setStep("select_flight");
     setSelectedFlight(null);
@@ -93,18 +95,11 @@ export default function RescheduleDialog({
 
     if (data) {
       const now = Date.now();
-
-      // FIX: Use Date.parse() or create dates without Z to keep local time context
-      const selectedDate = new Date(date);
-      const dayStart = new Date(
-        selectedDate.getFullYear(),
-        selectedDate.getMonth(),
-        selectedDate.getDate(),
-      ).getTime();
-      const dayEnd = dayStart + 24 * 60 * 60 * 1000 - 1;
+      const dayStart = parseISO(date + 'T00:00:00Z').getTime();
+      const dayEnd = parseISO(date + 'T23:59:59Z').getTime();
 
       const eligible = (data as Flight[]).filter((f) => {
-        const depTime = new Date(f.departs_at).getTime();
+        const depTime = parseISO(f.departs_at).getTime();
         return (
           f.id !== booking.flights?.id &&
           depTime >= dayStart &&
