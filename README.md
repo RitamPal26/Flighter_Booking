@@ -53,30 +53,34 @@ Fill in `.env.local`:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+SUPABASE_PASSWORD=<your-db-password>
 ```
 
 ### 4. Run Migrations
 
-Run the migration in the Supabase SQL editor (**SQL Editor > New Query**) or via the CLI:
+Run all 3 migration files in order in the Supabase SQL editor (**SQL Editor > New Query**):
 
-```sql
--- Paste supabase/migrations/20260522_initial_schema.sql
-```
+| Order | File |
+|---|---|
+| 1 | `supabase/migrations/20260522_initial_schema.sql` |
+| 2 | `supabase/migrations/20260523_fix_reschedule_atomicity.sql` |
+| 3 | `supabase/migrations/20260523_schema_qualify_functions.sql` |
 
 This creates:
 - `flights`, `seats`, `bookings`, `passengers`, `reschedules` tables
 - Row-Level Security policies
-- `book_seat` and `cancel_booking` RPC functions (atomic transactions)
+- `book_seat`, `cancel_booking`, `reschedule_booking` RPC functions (atomic transactions)
 - `enforce_cancellation_window` trigger (blocks cancel/reschedule within 2h of departure)
 
 ### 5. Seed Data
 
 Run `supabase/seed.sql` in the SQL editor to populate:
-- A test user
-- 8 flights across 4 routes
-- 120 seats per flight (first/business/economy classes)
+- A test user account
+- **29,344 flights** across all 56 city-to-city routes, 4 departure slots per day (00:00, 06:00, 12:00, 18:00 UTC)
+- **~5.3 million seats** with per-aircraft-type row counts (A350=45 rows, B787=40, B737=30, A320=28)
+- Flight numbers formatted as `FL-{ORIGIN}-{DESTINATION}-{3-digit-seq}` (e.g. `FL-CCU-DEL-001`)
 
-**Test credentials:** `test@example.com` / `password123`
+> **Note:** The seed generates flights from **May 23 to July 30, 2026**. Date pickers in the app are constrained to this range automatically.
 
 ### 6. Run the App
 
@@ -84,7 +88,69 @@ Run `supabase/seed.sql` in the SQL editor to populate:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Sign in with the test account to start booking.
+Open [http://localhost:3000](http://localhost:3000).
+
+---
+
+## Testing Guide
+
+### Test Account
+
+| Field | Value |
+|---|---|
+| Email | `test@example.com` |
+| Password | `password123` |
+
+---
+
+### How to Book a Flight
+
+| Step | What to do |
+|---|---|
+| **1** | Sign in with the test account |
+| **2** | Select **Origin** and **Destination** from the dropdown (8 airports: CCU, DEL, JFK, LHR, DXB, BOM, SFO, NRT) |
+| **3** | Pick a **Date** between May 23 – July 30, 2026 and set the number of passengers (1–9) |
+| **4** | Click **Search Flights** — a list of 4 flights appears with different aircraft types and prices |
+| **5** | Select a flight to open the seat map |
+| **6** | Click one or more available seats on the color-coded cabin map (purple = first, sky = business, stone = economy). Selected seats turn green |
+| **7** | Click **Continue** and fill in passenger details (name, passport, nationality, date of birth) for each seat |
+| **8** | Review the booking summary and click **Pay** (mock payment — any card works) |
+| **9** | The confirmation screen shows each ticket's PNR code, seat assignment, and price breakdown |
+
+### Available Routes (8 cities, 56 directed pairs)
+
+| | CCU | DEL | JFK | LHR | DXB | BOM | SFO | NRT |
+|---|---|---|---|---|---|---|---|---|
+| **CCU** | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **DEL** | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **JFK** | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **LHR** | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| **DXB** | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
+| **BOM** | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| **SFO** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ |
+| **NRT** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+
+### Daily Flight Slots
+
+| Slot | Departure (UTC) | Aircraft |
+|---|---|---|
+| N | 00:00 | Airbus A350-900 |
+| M | 06:00 | Boeing 737-800 |
+| A | 12:00 | Airbus A320neo |
+| E | 18:00 | Boeing 787 Dreamliner |
+
+Each slot letter is part of the flight number: `FL-CCU-DEL-N-001`, `FL-CCU-DEL-M-002`, etc.
+
+### Rescheduling & Cancellation
+
+1. Go to **My Bookings** from the navbar
+2. Click **Reschedule** or **Cancel** on any confirmed booking
+3. Rescheduling opens a dialog to pick a new flight, seat, and review the price breakdown (includes $50 reschedule fee)
+4. Cancellation prompts a confirmation dialog
+
+> Both actions are blocked if the original flight departs within **2 hours** (enforced by a DB trigger).
+
+---
 
 ## Project Structure
 
