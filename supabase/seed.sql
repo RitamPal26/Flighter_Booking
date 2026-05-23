@@ -44,28 +44,31 @@ DELETE FROM flights;
 ALTER TABLE bookings ENABLE TRIGGER check_cancellation_window;
 
 -- ==========================================
--- Part C: Flights — May 23 → Sep 30, 2026
--- 4 fixed daily slots per route, 56 routes
+-- Part C: Flights — May 23 → July 30, 2026
+-- 4 Routes, 4 Slots, 3 Plane Types
 -- ==========================================
 INSERT INTO flights (id, flight_no, origin, destination, departs_at, arrives_at, aircraft_type, status, base_price)
-WITH cities AS (
-    SELECT unnest(ARRAY['CCU', 'DEL', 'JFK', 'LHR', 'DXB', 'BOM', 'SFO', 'NRT']) as code
-),
-routes AS (
-    SELECT a.code as origin, b.code as destination
-    FROM cities a CROSS JOIN cities b WHERE a.code != b.code
+WITH routes AS (
+    -- Exactly 4 Indian Domestic Routes
+    SELECT * FROM (VALUES 
+        ('DEL', 'BOM'), 
+        ('BOM', 'DEL'), 
+        ('DEL', 'CCU'), 
+        ('CCU', 'DEL')
+    ) AS t(origin, destination)
 ),
 days AS (
+    -- 68 days from May 23 to July 30
     SELECT ('2026-05-23 00:00:00'::timestamp + (i * INTERVAL '1 day')) as base_date
-    FROM generate_series(0, 130) i
+    FROM generate_series(0, 68) i
 ),
 slots AS (
-    SELECT *
-    FROM (VALUES
-        ('N'::text, INTERVAL '0 hours'::interval, 'Airbus A350-900'::text),
-        ('M'::text, INTERVAL '6 hours'::interval, 'Boeing 737-800'::text),
-        ('A'::text, INTERVAL '12 hours'::interval, 'Airbus A320neo'::text),
-        ('E'::text, INTERVAL '18 hours'::interval, 'Boeing 787 Dreamliner'::text)
+    -- 4 Flights Daily, 3 Plane Types
+    SELECT * FROM (VALUES
+        ('M'::text, INTERVAL '6 hours'::interval, 'Airbus A320neo'::text),
+        ('A'::text, INTERVAL '12 hours'::interval, 'Boeing 737-800'::text),
+        ('E'::text, INTERVAL '18 hours'::interval, 'Airbus A321'::text),
+        ('N'::text, INTERVAL '22 hours'::interval, 'Airbus A320neo'::text)
     ) AS t(slot_code, dep_offset, aircraft_type)
 ),
 flight_data AS (
@@ -73,9 +76,9 @@ flight_data AS (
         r.origin,
         r.destination,
         (d.base_date + s.dep_offset) as departs_at,
-        (d.base_date + s.dep_offset + INTERVAL '5 hours') as arrives_at,
+        (d.base_date + s.dep_offset + INTERVAL '2.5 hours') as arrives_at, -- Domestic flight duration
         s.aircraft_type,
-        floor(random() * 500 + 150)::int as base_price
+        floor(random() * 150 + 80)::int as base_price -- Cheaper domestic fares
     FROM routes r
     CROSS JOIN days d
     CROSS JOIN slots s
@@ -99,265 +102,47 @@ SELECT
 FROM flight_data f;
 
 -- ==========================================
--- Part D: Seats — per aircraft type (batched by month × type)
--- Each INSERT handles one aircraft type for one month (~200–470K rows)
+-- Part D: Seats — All flights generated in a single query
+-- Scales dynamically based on the 3 plane types
 -- ==========================================
--- May 23–31 · Airbus A350-900 (rows 1–6 first · 7–18 business · 19–45 economy)
 INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 6 THEN 'first' WHEN row_num <= 18 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 6 THEN 200 WHEN row_num <= 18 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 45) row_num
+WITH flight_config AS (
+    SELECT 
+        id as flight_id, 
+        aircraft_type,
+        CASE aircraft_type
+            WHEN 'Airbus A320neo' THEN 28 
+            WHEN 'Boeing 737-800' THEN 30
+            WHEN 'Airbus A321' THEN 35 
+        END as max_rows,
+        CASE aircraft_type
+            WHEN 'Airbus A320neo' THEN 3 
+            WHEN 'Boeing 737-800' THEN 4 
+            WHEN 'Airbus A321' THEN 5 
+        END as first_class_limit,
+        CASE aircraft_type
+            WHEN 'Airbus A320neo' THEN 8 
+            WHEN 'Boeing 737-800' THEN 10 
+            WHEN 'Airbus A321' THEN 12 
+        END as business_class_limit
+    FROM flights
+)
+SELECT 
+    fc.flight_id, 
+    row_num || col AS seat_number,
+    CASE 
+        WHEN row_num <= fc.first_class_limit THEN 'first'
+        WHEN row_num <= fc.business_class_limit THEN 'business' 
+        ELSE 'economy' 
+    END as class,
+    (random() > 0.15) as is_available,
+    CASE 
+        WHEN row_num <= fc.first_class_limit THEN 150
+        WHEN row_num <= fc.business_class_limit THEN 50 
+        ELSE 0 
+    END as extra_fee
+FROM flight_config fc
+CROSS JOIN generate_series(1, 35) row_num
 CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A350-900'
-  AND f.departs_at >= '2026-05-23' AND f.departs_at < '2026-06-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- May 23–31 · Boeing 787 Dreamliner (rows 1–5 first · 6–15 business · 16–40 economy)
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 5 THEN 'first' WHEN row_num <= 15 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 5 THEN 200 WHEN row_num <= 15 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 40) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 787 Dreamliner'
-  AND f.departs_at >= '2026-05-23' AND f.departs_at < '2026-06-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- May 23–31 · Boeing 737-800 (rows 1–4 first · 5–10 business · 11–30 economy)
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 4 THEN 'first' WHEN row_num <= 10 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 4 THEN 200 WHEN row_num <= 10 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 30) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 737-800'
-  AND f.departs_at >= '2026-05-23' AND f.departs_at < '2026-06-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- May 23–31 · Airbus A320neo (rows 1–3 first · 4–8 business · 9–28 economy)
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 3 THEN 'first' WHEN row_num <= 8 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 3 THEN 200 WHEN row_num <= 8 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 28) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A320neo'
-  AND f.departs_at >= '2026-05-23' AND f.departs_at < '2026-06-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- June · Airbus A350-900
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 6 THEN 'first' WHEN row_num <= 18 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 6 THEN 200 WHEN row_num <= 18 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 45) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A350-900'
-  AND f.departs_at >= '2026-06-01' AND f.departs_at < '2026-07-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- June · Boeing 787 Dreamliner
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 5 THEN 'first' WHEN row_num <= 15 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 5 THEN 200 WHEN row_num <= 15 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 40) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 787 Dreamliner'
-  AND f.departs_at >= '2026-06-01' AND f.departs_at < '2026-07-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- June · Boeing 737-800
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 4 THEN 'first' WHEN row_num <= 10 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 4 THEN 200 WHEN row_num <= 10 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 30) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 737-800'
-  AND f.departs_at >= '2026-06-01' AND f.departs_at < '2026-07-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- June · Airbus A320neo
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 3 THEN 'first' WHEN row_num <= 8 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 3 THEN 200 WHEN row_num <= 8 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 28) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A320neo'
-  AND f.departs_at >= '2026-06-01' AND f.departs_at < '2026-07-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- July · Airbus A350-900 (rows 1–6 first · 7–18 business · 19–45 economy)
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 6 THEN 'first' WHEN row_num <= 18 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 6 THEN 200 WHEN row_num <= 18 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 45) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A350-900'
-  AND f.departs_at >= '2026-07-01' AND f.departs_at < '2026-08-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- July · Boeing 787 Dreamliner (rows 1–5 first · 6–15 business · 16–40 economy)
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 5 THEN 'first' WHEN row_num <= 15 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 5 THEN 200 WHEN row_num <= 15 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 40) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 787 Dreamliner'
-  AND f.departs_at >= '2026-07-01' AND f.departs_at < '2026-08-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- July · Boeing 737-800 (rows 1–4 first · 5–10 business · 11–30 economy)
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 4 THEN 'first' WHEN row_num <= 10 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 4 THEN 200 WHEN row_num <= 10 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 30) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 737-800'
-  AND f.departs_at >= '2026-07-01' AND f.departs_at < '2026-08-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- July · Airbus A320neo (rows 1–3 first · 4–8 business · 9–28 economy)
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 3 THEN 'first' WHEN row_num <= 8 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 3 THEN 200 WHEN row_num <= 8 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 28) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A320neo'
-  AND f.departs_at >= '2026-07-01' AND f.departs_at < '2026-08-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- August · Airbus A350-900
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 6 THEN 'first' WHEN row_num <= 18 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 6 THEN 200 WHEN row_num <= 18 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 45) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A350-900'
-  AND f.departs_at >= '2026-08-01' AND f.departs_at < '2026-09-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- August · Boeing 787 Dreamliner
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 5 THEN 'first' WHEN row_num <= 15 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 5 THEN 200 WHEN row_num <= 15 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 40) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 787 Dreamliner'
-  AND f.departs_at >= '2026-08-01' AND f.departs_at < '2026-09-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- August · Boeing 737-800
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 4 THEN 'first' WHEN row_num <= 10 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 4 THEN 200 WHEN row_num <= 10 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 30) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 737-800'
-  AND f.departs_at >= '2026-08-01' AND f.departs_at < '2026-09-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- August · Airbus A320neo
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 3 THEN 'first' WHEN row_num <= 8 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 3 THEN 200 WHEN row_num <= 8 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 28) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A320neo'
-  AND f.departs_at >= '2026-08-01' AND f.departs_at < '2026-09-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- September · Airbus A350-900
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 6 THEN 'first' WHEN row_num <= 18 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 6 THEN 200 WHEN row_num <= 18 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 45) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A350-900'
-  AND f.departs_at >= '2026-09-01' AND f.departs_at < '2026-10-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- September · Boeing 787 Dreamliner
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 5 THEN 'first' WHEN row_num <= 15 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 5 THEN 200 WHEN row_num <= 15 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 40) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 787 Dreamliner'
-  AND f.departs_at >= '2026-09-01' AND f.departs_at < '2026-10-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- September · Boeing 737-800
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 4 THEN 'first' WHEN row_num <= 10 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 4 THEN 200 WHEN row_num <= 10 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 30) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Boeing 737-800'
-  AND f.departs_at >= '2026-09-01' AND f.departs_at < '2026-10-01'
-ON CONFLICT (flight_id, seat_number) DO NOTHING;
-
--- September · Airbus A320neo
-INSERT INTO seats (flight_id, seat_number, class, is_available, extra_fee)
-SELECT f.id, row_num || col,
-    CASE WHEN row_num <= 3 THEN 'first' WHEN row_num <= 8 THEN 'business' ELSE 'economy' END,
-    random() > 0.15,
-    CASE WHEN row_num <= 3 THEN 200 WHEN row_num <= 8 THEN 80 ELSE 0 END
-FROM flights f
-CROSS JOIN generate_series(1, 28) row_num
-CROSS JOIN unnest(ARRAY['A','B','C','D','E','F']) col
-WHERE f.aircraft_type = 'Airbus A320neo'
-  AND f.departs_at >= '2026-09-01' AND f.departs_at < '2026-10-01'
+WHERE row_num <= fc.max_rows
 ON CONFLICT (flight_id, seat_number) DO NOTHING;

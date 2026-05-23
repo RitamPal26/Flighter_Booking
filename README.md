@@ -76,9 +76,9 @@ This creates:
 
 Run `supabase/seed.sql` in the SQL editor to populate:
 - A test user account
-- **29,344 flights** across all 56 city-to-city routes, 4 departure slots per day (00:00, 06:00, 12:00, 18:00 UTC)
-- **~5.3 million seats** with per-aircraft-type row counts (A350=45 rows, B787=40, B737=30, A320=28)
-- Flight numbers formatted as `FL-{ORIGIN}-{DESTINATION}-{3-digit-seq}` (e.g. `FL-CCU-DEL-001`)
+- **~4,416 flights** across 4 Indian domestic routes, 4 departure slots per day (06:00, 12:00, 18:00, 22:00 UTC)
+- **~530K seats** with per-aircraft-type row counts (A320neo=28 rows, B737-800=30 rows, A321=35 rows)
+- Flight numbers formatted as `FL-{ORIGIN}-{DESTINATION}-{3-digit-seq}` (e.g. `FL-DEL-BOM-001`)
 
 > **Note:** The seed generates flights from **May 23 to July 30, 2026**. Date pickers in the app are constrained to this range automatically.
 
@@ -97,9 +97,11 @@ Open [http://localhost:3000](http://localhost:3000).
 ### Test Account
 
 | Field | Value |
-|---|---|
+|---|---|---|
 | Email | `ritamjunior26@gmail.com` |
 | Password | `12345678` |
+
+> The database seed creates `test@example.com` / `password123`. The account `ritamjunior26@gmail.com` is used for production testing — sign up through the app or create it manually in Supabase Auth.
 
 ---
 
@@ -108,38 +110,34 @@ Open [http://localhost:3000](http://localhost:3000).
 | Step | What to do |
 |---|---|
 | **1** | Sign in with the test account |
-| **2** | Select **Origin** and **Destination** from the dropdown (8 airports: CCU, DEL, JFK, LHR, DXB, BOM, SFO, NRT) |
+| **2** | Select **Origin** and **Destination** from the dropdown (DEL, BOM, CCU) |
 | **3** | Pick a **Date** between May 23 – July 30, 2026 and set the number of passengers (1–9) |
-| **4** | Click **Search Flights** — a list of 4 flights appears with different aircraft types and prices |
+| **4** | Click **Search Flights** — a list of up to 4 flights appears with different aircraft types and prices |
 | **5** | Select a flight to open the seat map |
 | **6** | Click one or more available seats on the color-coded cabin map (purple = first, sky = business, stone = economy). Selected seats turn green |
 | **7** | Click **Continue** and fill in passenger details (name, passport, nationality, date of birth) for each seat |
 | **8** | Review the booking summary and click **Pay** (mock payment — any card works) |
 | **9** | The confirmation screen shows each ticket's PNR code, seat assignment, and price breakdown |
 
-### Available Routes (8 cities, 56 directed pairs)
+### Available Routes (3 cities, 4 directed pairs)
 
-| | CCU | DEL | JFK | LHR | DXB | BOM | SFO | NRT |
-|---|---|---|---|---|---|---|---|---|
-| **CCU** | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **DEL** | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **JFK** | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **LHR** | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ |
-| **DXB** | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
-| **BOM** | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ |
-| **SFO** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ |
-| **NRT** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| From | To | Route |
+|---|---|---|
+| DEL | BOM | Delhi → Mumbai |
+| BOM | DEL | Mumbai → Delhi |
+| DEL | CCU | Delhi → Kolkata |
+| CCU | DEL | Kolkata → Delhi |
 
 ### Daily Flight Slots
 
-| Slot | Departure (UTC) | Aircraft |
-|---|---|---|
-| N | 00:00 | Airbus A350-900 |
-| M | 06:00 | Boeing 737-800 |
-| A | 12:00 | Airbus A320neo |
-| E | 18:00 | Boeing 787 Dreamliner |
+| Slot | Departure (UTC) | Aircraft | Rows | Seats | Base Fare |
+|---|---|---|---|---|---|
+| M | 06:00 | Airbus A320neo | 28 | 168 | $80–$230 |
+| A | 12:00 | Boeing 737-800 | 30 | 180 | $80–$230 |
+| E | 18:00 | Airbus A321 | 35 | 210 | $80–$230 |
+| N | 22:00 | Airbus A320neo | 28 | 168 | $80–$230 |
 
-Each slot letter is part of the flight number: `FL-CCU-DEL-N-001`, `FL-CCU-DEL-M-002`, etc.
+Slot letters appear in flight numbers: `FL-DEL-BOM-001`, `FL-DEL-BOM-002`, etc. (sequenced per route).
 
 ### Rescheduling & Cancellation
 
