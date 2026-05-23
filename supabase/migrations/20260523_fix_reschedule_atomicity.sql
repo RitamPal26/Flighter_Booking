@@ -1,5 +1,6 @@
 -- 1. Track the new booking in reschedules
 ALTER TABLE reschedules ADD COLUMN new_booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_reschedules_new_booking_id ON reschedules(new_booking_id);
 
 -- 2. Update trigger to also fire on 'rescheduled' status changes
 CREATE OR REPLACE FUNCTION enforce_cancellation_window()

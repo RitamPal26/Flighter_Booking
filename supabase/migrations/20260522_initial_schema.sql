@@ -65,22 +65,24 @@ CREATE POLICY "Flights are viewable by everyone" ON flights FOR SELECT USING (tr
 CREATE POLICY "Seats are viewable by everyone" ON seats FOR SELECT USING (true);
 
 -- Users can only access their own bookings and related data
-CREATE POLICY "Users can view their own bookings" ON bookings FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert their own bookings" ON bookings FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update their own bookings" ON bookings FOR UPDATE USING (auth.uid() = user_id);
+-- (select auth.uid()) is used instead of auth.uid() for initplan optimization —
+-- it evaluates once per query rather than once per row
+CREATE POLICY "Users can view their own bookings" ON bookings FOR SELECT USING ((select auth.uid()) = user_id);
+CREATE POLICY "Users can insert their own bookings" ON bookings FOR INSERT WITH CHECK ((select auth.uid()) = user_id);
+CREATE POLICY "Users can update their own bookings" ON bookings FOR UPDATE USING ((select auth.uid()) = user_id);
 
 CREATE POLICY "Users can view their passengers" ON passengers FOR SELECT USING (
-    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = (select auth.uid()))
 );
 CREATE POLICY "Users can insert passengers" ON passengers FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = (select auth.uid()))
 );
 
 CREATE POLICY "Users can view their reschedules" ON reschedules FOR SELECT USING (
-    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = (select auth.uid()))
 );
 CREATE POLICY "Users can insert reschedules" ON reschedules FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = auth.uid())
+    EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = (select auth.uid()))
 );
 
 -- 3. RPC Function for atomic seat reservation (Prevents double-booking)
@@ -180,3 +182,13 @@ REVOKE EXECUTE ON FUNCTION book_seat(UUID, UUID, UUID, NUMERIC, TEXT) FROM anon,
 REVOKE EXECUTE ON FUNCTION cancel_booking(UUID) FROM anon, public;
 GRANT EXECUTE ON FUNCTION book_seat(UUID, UUID, UUID, NUMERIC, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION cancel_booking(UUID) TO authenticated;
+
+-- 6. Performance indexes on foreign key columns
+CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_flight_id ON bookings(flight_id);
+CREATE INDEX IF NOT EXISTS idx_bookings_seat_id ON bookings(seat_id);
+CREATE INDEX IF NOT EXISTS idx_passengers_booking_id ON passengers(booking_id);
+CREATE INDEX IF NOT EXISTS idx_reschedules_booking_id ON reschedules(booking_id);
+CREATE INDEX IF NOT EXISTS idx_reschedules_old_flight_id ON reschedules(old_flight_id);
+CREATE INDEX IF NOT EXISTS idx_reschedules_new_flight_id ON reschedules(new_flight_id);
+CREATE INDEX IF NOT EXISTS idx_seats_flight_id ON seats(flight_id);
