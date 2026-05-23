@@ -12,7 +12,7 @@ import SeatMap from "@/components/seats/SeatMap";
 import CheckoutDialog from "@/components/checkout/CheckoutDialog";
 import PassengerDetailsForm from "@/components/checkout/PassengerDetailsForm";
 import ConfirmationView from "@/components/notifications/ConfirmationView";
-import { formatTime, formatCurrency } from "@/utils/formatters";
+import { formatTime, formatCurrency, formatDate } from "@/utils/formatters";
 
 const FlightGlobe = dynamic(() => import("./FlightGlobe"), {
   ssr: false,
@@ -121,6 +121,9 @@ export default function FlightDashboard() {
 
                   <div className="flex items-center gap-4 flex-1 justify-center">
                     <div className="text-right">
+                      <p className="text-xs text-gray-400">
+                        {formatDate(flight.departs_at)}
+                      </p>
                       <p className="text-xl font-bold">
                         {formatTime(flight.departs_at)}
                       </p>
@@ -132,6 +135,9 @@ export default function FlightDashboard() {
                       </div>
                     </div>
                     <div className="text-left">
+                      <p className="text-xs text-gray-400">
+                        {formatDate(flight.arrives_at)}
+                      </p>
                       <p className="text-xl font-bold">
                         {formatTime(flight.arrives_at)}
                       </p>

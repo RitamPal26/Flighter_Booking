@@ -2,7 +2,7 @@
 TRUNCATE TABLE seats CASCADE;
 DELETE FROM flights;
 
--- 2. Populate flights from Jan 1, 2025 to Dec 31, 2027
+-- 2. Populate flights for the year 2026 only (full year)
 INSERT INTO flights (flight_no, origin, destination, departs_at, arrives_at, base_price, aircraft_type)
 WITH cities AS (
     SELECT unnest(ARRAY['CCU', 'DEL', 'JFK', 'LHR', 'DXB', 'BOM', 'SFO', 'NRT']) as code
@@ -12,9 +12,9 @@ routes AS (
     FROM cities a CROSS JOIN cities b WHERE a.code != b.code
 ),
 flight_times AS (
-    -- Start at Jan 1, 2025 and add 'i' days up to 1095 days (3 full years)
-    SELECT ('2025-01-01 00:00:00'::timestamp + (i * INTERVAL '1 day')) as base_date 
-    FROM generate_series(0, 1095) i
+    -- Start at Jan 1, 2026 and add 'i' days up to 364 days (full year)
+    SELECT ('2026-01-01 00:00:00'::timestamp + (i * INTERVAL '1 day')) as base_date 
+    FROM generate_series(0, 364) i
 )
 SELECT 
     'FL' || floor(random() * 9000 + 1000)::text as flight_no,
