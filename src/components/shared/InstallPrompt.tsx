@@ -1,18 +1,17 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
 export default function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<Event | null>(null)
   const [showPrompt, setShowPrompt] = useState(false)
+  const deferredPromptRef = useRef<Event | null>(null)
 
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault()
-      setDeferredPrompt(e)
+      deferredPromptRef.current = e
       setShowPrompt(true)
     }
 
@@ -24,16 +23,17 @@ export default function InstallPrompt() {
   }, [])
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return
+    const promptEvent = deferredPromptRef.current
+    if (!promptEvent) return
 
-    const promptEvent = deferredPrompt as unknown as { prompt: () => void; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
-    promptEvent.prompt()
+    const pEvent = promptEvent as unknown as { prompt: () => void; userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }> }
+    pEvent.prompt()
 
-    const result = await promptEvent.userChoice
+    const result = await pEvent.userChoice
     if (result.outcome === "accepted") {
       setShowPrompt(false)
     }
-    setDeferredPrompt(null)
+    deferredPromptRef.current = null
   }
 
   if (!showPrompt) return null

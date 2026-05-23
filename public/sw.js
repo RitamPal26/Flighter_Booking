@@ -4,6 +4,8 @@ const STATIC_ASSETS = [
   "/",
   "/offline",
   "/manifest.json",
+  "/icons/icon-192x192.svg",
+  "/icons/icon-512x512.svg",
 ]
 
 self.addEventListener("install", (event) => {
@@ -38,6 +40,8 @@ self.addEventListener("fetch", (event) => {
           })
         }
         return fetchResponse
+      }).catch(() => {
+        return caches.match("/offline")
       })
     })
   )
