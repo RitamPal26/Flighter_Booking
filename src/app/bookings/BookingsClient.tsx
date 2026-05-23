@@ -45,12 +45,6 @@ interface BookingWithJoins {
   } | null
 }
 
-function isWithinTwoHours(departsAt: string): boolean {
-  const departs = new Date(departsAt).getTime()
-  const now = Date.now()
-  return departs - now < 2 * 60 * 60 * 1000
-}
-
 export default function BookingsClient({
   bookings,
 }: {
@@ -162,12 +156,6 @@ export default function BookingsClient({
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={!flight || isWithinTwoHours(flight.departs_at)}
-                          title={
-                            flight && isWithinTwoHours(flight.departs_at)
-                              ? "Cannot reschedule within 2 hours of departure"
-                              : ""
-                          }
                           onClick={() => setRescheduleTarget(booking)}
                         >
                           Reschedule
@@ -175,12 +163,7 @@ export default function BookingsClient({
                         <Button
                           variant="destructive"
                           size="sm"
-                          disabled={cancellingId === booking.id || (!!flight && isWithinTwoHours(flight.departs_at))}
-                          title={
-                            flight && isWithinTwoHours(flight.departs_at)
-                              ? "Cannot cancel within 2 hours of departure"
-                              : ""
-                          }
+                          disabled={cancellingId === booking.id}
                           onClick={() => setCancelTarget(booking.id)}
                         >
                           {cancellingId === booking.id ? (
