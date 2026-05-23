@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { flightService } from "@/lib/supabase/queries"
 import { rescheduleBooking } from "@/app/actions/bookingActions"
 import { formatCurrency, formatTime } from "@/utils/formatters"
@@ -37,7 +38,7 @@ interface RescheduleDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
-type Step = "select_flight" | "select_seat" | "confirming"
+type Step = "select_flight" | "select_seat" | "confirm"
 
 export default function RescheduleDialog({
   booking,
@@ -46,6 +47,7 @@ export default function RescheduleDialog({
 }: RescheduleDialogProps) {
   const router = useRouter()
   const [step, setStep] = useState<Step>("select_flight")
+  const [date, setDate] = useState("")
   const [flights, setFlights] = useState<Flight[]>([])
   const [seats, setSeats] = useState<Seat[]>([])
   const [selectedFlight, setSelectedFlight] = useState<Flight | null>(null)
@@ -56,24 +58,34 @@ export default function RescheduleDialog({
 
   useEffect(() => {
     if (!open) return
-
-    const init = async () => {
-      setIsLoadingFlights(true)
-      setStep("select_flight")
-      setSelectedFlight(null)
-      setSelectedSeat(null)
-      setSeats([])
-      setFlights([])
-
-      const { data, error } = await flightService.getAllFlights()
-      if (!error && data) {
-        setFlights(data as Flight[])
-      }
-      setIsLoadingFlights(false)
-    }
-
-    init()
+    const today = new Date()
+    const defaultDate = today.toISOString().slice(0, 10)
+    setDate(defaultDate)
+    setStep("select_flight")
+    setSelectedFlight(null)
+    setSelectedSeat(null)
+    setSeats([])
+    setFlights([])
   }, [open])
+
+  const handleSearch = async () => {
+    if (!date || !booking.flights) return
+    setIsLoadingFlights(true)
+    const { data, error } = await flightService.searchFlightsByDate(
+      booking.flights.origin,
+      booking.flights.destination,
+      date,
+    )
+    if (!error && data) {
+      setFlights(data as Flight[])
+    }
+    setIsLoadingFlights(false)
+  }
+
+  useEffect(() => {
+    if (!open || !date || !booking.flights) return
+    handleSearch()
+  }, [open, date])
 
   const handleFlightSelect = async (flight: Flight) => {
     setSelectedFlight(flight)
@@ -97,14 +109,12 @@ export default function RescheduleDialog({
     if (!selectedFlight || !selectedSeat) return
 
     setIsProcessing(true)
-    setStep("confirming")
 
     const result = await rescheduleBooking(booking.id, selectedFlight.id, selectedSeat.id)
 
     if (!result.success) {
       toast.error("Reschedule Failed", { description: result.error })
       setIsProcessing(false)
-      setStep("select_seat")
       return
     }
 
@@ -119,7 +129,23 @@ export default function RescheduleDialog({
   if (!booking) return null
 
   const rescheduleFee = 50
-  const newTotal = booking.total_price + rescheduleFee
+  const newTotal = (selectedFlight?.base_price ?? 0) + (selectedSeat?.extra_fee ?? 0) + rescheduleFee
+
+  const classLabel: Record<string, string> = {
+    first: "First Class",
+    business: "Business Class",
+    economy: "Economy Class",
+  }
+
+  const classTheme: Record<string, string> = {
+    first: "border-purple-400 bg-purple-100 text-purple-900",
+    business: "border-sky-400 bg-sky-100 text-sky-900",
+    economy: "border-stone-300 bg-stone-100 text-stone-800",
+  }
+
+  const colHeaders = ["A", "B", "C", "", "D", "E", "F"]
+
+  const getRowNum = (seatNumber: string) => parseInt(seatNumber.replace(/[A-F]/g, ""), 10)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,25 +153,41 @@ export default function RescheduleDialog({
         <DialogHeader>
           <DialogTitle>Reschedule Booking</DialogTitle>
           <DialogDescription>
-            {step === "select_flight" && "Choose a new flight for your rescheduled journey."}
+            {step === "select_flight" && "Pick a new date and flight for your rescheduled journey."}
             {step === "select_seat" && "Select a seat on the new flight."}
-            {step === "confirming" && "Processing your reschedule..."}
+            {step === "confirm" && "Review and confirm your reschedule."}
           </DialogDescription>
         </DialogHeader>
 
         {step === "select_flight" && (
           <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Current booking: {booking.flights?.flight_no} &middot;{" "}
+              {booking.flights?.origin} &rarr; {booking.flights?.destination}
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Travel Date</label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </div>
+
             {isLoadingFlights ? (
               <div className="flex justify-center py-8">
                 <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Current booking: {booking.flights?.flight_no} ({booking.flights?.origin} &rarr; {booking.flights?.destination})
-                </p>
-                <div className="grid gap-3 max-h-80 overflow-y-auto pr-1">
-                  {flights.map((flight) => (
+              <div className="grid gap-3 max-h-72 overflow-y-auto pr-1">
+                {flights.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    {date ? "No flights found on this date." : "Select a date to search flights."}
+                  </p>
+                ) : (
+                  flights.map((flight) => (
                     <Card
                       key={flight.id}
                       className={`cursor-pointer transition-colors hover:border-blue-400 ${
@@ -172,9 +214,17 @@ export default function RescheduleDialog({
                         </div>
                       </CardContent>
                     </Card>
-                  ))}
-                </div>
-              </>
+                  ))
+                )}
+              </div>
+            )}
+
+            {flights.length > 0 && (
+              <div className="flex justify-end pt-2">
+                <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancel
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -182,7 +232,8 @@ export default function RescheduleDialog({
         {step === "select_seat" && selectedFlight && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              New flight: {selectedFlight.flight_no} &middot; {selectedFlight.origin} &rarr; {selectedFlight.destination}
+              {selectedFlight.flight_no} &middot; {selectedFlight.origin} &rarr;{" "}
+              {selectedFlight.destination} &middot; {formatTime(selectedFlight.departs_at)}
             </p>
 
             {isLoadingSeats ? (
@@ -191,46 +242,75 @@ export default function RescheduleDialog({
               </div>
             ) : (
               <>
-                <div className="flex gap-3 text-xs flex-wrap">
-                  {["first", "business", "economy"].map((cls) => {
-                    const clsSeats = seats.filter((s) => s.class === cls && s.is_available)
-                    return (
-                      <div key={cls} className="flex items-center gap-1.5">
-                        <div className={`w-3 h-3 rounded ${
-                          cls === "first" ? "bg-purple-300" : cls === "business" ? "bg-sky-300" : "bg-stone-200"
-                        }`} />
-                        <span className="capitalize">{cls}</span>
-                        <span className="text-muted-foreground">({clsSeats.length})</span>
-                      </div>
-                    )
-                  })}
+                <div className="flex gap-4 text-sm justify-center flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-purple-300 border border-purple-400 rounded"></div> First
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-sky-300 border border-sky-400 rounded"></div> Business
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-stone-200 border border-stone-300 rounded"></div> Economy
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-green-500 rounded"></div> Selected
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 bg-gray-300 rounded"></div> Occupied
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-6 gap-2 max-h-60 overflow-y-auto pr-1">
-                  {seats.map((seat) => {
-                    const isSelected = selectedSeat?.id === seat.id
-                    const seatColor = !seat.is_available
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-50"
-                      : isSelected
-                        ? "bg-green-500 text-white border-green-600"
-                        : seat.class === "first"
-                          ? "bg-purple-200 hover:bg-purple-300 border-purple-400 cursor-pointer"
-                          : seat.class === "business"
-                            ? "bg-sky-200 hover:bg-sky-300 border-sky-400 cursor-pointer"
-                            : "bg-stone-100 hover:bg-stone-200 border-stone-300 cursor-pointer"
+                <div className="overflow-x-auto pb-4">
+                  <div className="min-w-[500px] space-y-6">
+                    {["first", "business", "economy"].map((cls) => {
+                      const clsSeats = seats.filter((s) => s.class === cls)
+                      if (clsSeats.length === 0) return null
+                      const startRow = getRowNum(clsSeats[0].seat_number)
+                      const endRow = getRowNum(clsSeats[clsSeats.length - 1].seat_number)
 
-                    return (
-                      <button
-                        key={seat.id}
-                        disabled={!seat.is_available}
-                        onClick={() => handleSeatSelect(seat)}
-                        className={`h-10 text-xs font-medium rounded border transition-colors ${seatColor}`}
-                        title={`${seat.seat_number} - ${seat.class}${seat.extra_fee > 0 ? ` (+$${seat.extra_fee})` : ""}`}
-                      >
-                        {seat.seat_number}
-                      </button>
-                    )
-                  })}
+                      return (
+                        <div key={cls}>
+                          <div className={`border-2 rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wider mb-3 ${classTheme[cls]}`}>
+                            {classLabel[cls]} &middot; Rows {startRow}&ndash;{endRow}
+                          </div>
+                          <div className="grid grid-cols-7 gap-2 text-center items-center justify-items-center">
+                            {colHeaders.map((col, i) => (
+                              <div key={i} className="font-bold text-gray-400 text-xs w-10">
+                                {col}
+                              </div>
+                            ))}
+                            {clsSeats.map((seat, idx) => {
+                              const isAisleNext = (idx + 1) % 6 === 3
+                              const isSelected = selectedSeat?.id === seat.id
+                              const seatColor = !seat.is_available
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed opacity-50"
+                                : isSelected
+                                  ? "bg-green-500 hover:bg-green-600 text-white"
+                                  : seat.class === "first"
+                                    ? "bg-purple-200 hover:bg-purple-300 border-purple-400 text-purple-900"
+                                    : seat.class === "business"
+                                      ? "bg-sky-200 hover:bg-sky-300 border-sky-400 text-sky-900"
+                                      : "bg-stone-100 hover:bg-stone-200 border-stone-300 text-stone-800"
+
+                              return (
+                                <div key={seat.id} className="contents">
+                                  <button
+                                    disabled={!seat.is_available}
+                                    onClick={() => handleSeatSelect(seat)}
+                                    className={`w-11 h-11 text-xs font-medium rounded border transition-colors ${seatColor}`}
+                                    title={`${seat.seat_number} - ${seat.class.toUpperCase()}${seat.extra_fee > 0 ? ` (+$${seat.extra_fee})` : ""}`}
+                                  >
+                                    {getRowNum(seat.seat_number)}
+                                  </button>
+                                  {isAisleNext && <div className="w-6"></div>}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
 
                 <div className="border-t pt-4 space-y-2">
@@ -238,6 +318,16 @@ export default function RescheduleDialog({
                     <span className="text-muted-foreground">Original total</span>
                     <span>{formatCurrency(booking.total_price)}</span>
                   </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">New base fare</span>
+                    <span>{formatCurrency(selectedFlight.base_price)}</span>
+                  </div>
+                  {selectedSeat && selectedSeat.extra_fee > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Seat upgrade fee</span>
+                      <span>{formatCurrency(selectedSeat.extra_fee)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Reschedule fee</span>
                     <span>{formatCurrency(rescheduleFee)}</span>
@@ -258,9 +348,9 @@ export default function RescheduleDialog({
                   <Button
                     className="flex-1"
                     disabled={!selectedSeat}
-                    onClick={handleConfirm}
+                    onClick={() => setStep("confirm")}
                   >
-                    Confirm Reschedule
+                    Continue to Confirmation
                   </Button>
                 </div>
               </>
@@ -268,12 +358,85 @@ export default function RescheduleDialog({
           </div>
         )}
 
-        {step === "confirming" && (
-          <div className="flex flex-col items-center justify-center py-12 space-y-4">
-            <Loader2Icon className="size-10 animate-spin text-blue-500" />
-            <p className="text-sm text-muted-foreground">
-              {isProcessing ? "Processing your reschedule..." : "Please wait..."}
-            </p>
+        {step === "confirm" && selectedFlight && selectedSeat && (
+          <div className="space-y-4">
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">New Flight</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Flight</span>
+                <span className="font-medium">{selectedFlight.flight_no}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Route</span>
+                <span className="font-medium">
+                  {selectedFlight.origin} &rarr; {selectedFlight.destination}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Departure</span>
+                <span className="font-medium">{formatTime(selectedFlight.departs_at)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Arrival</span>
+                <span className="font-medium">{formatTime(selectedFlight.arrives_at)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Seat</span>
+                <span className="font-medium">
+                  {selectedSeat.seat_number} &middot; <span className="capitalize">{selectedSeat.class}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-2 text-sm">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Price Breakdown</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Original booking</span>
+                <span>{formatCurrency(booking.total_price)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">New base fare</span>
+                <span>{formatCurrency(selectedFlight.base_price)}</span>
+              </div>
+              {selectedSeat.extra_fee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Seat upgrade fee</span>
+                  <span>{formatCurrency(selectedSeat.extra_fee)}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Reschedule fee</span>
+                <span>{formatCurrency(rescheduleFee)}</span>
+              </div>
+              <div className="border-t pt-2 flex justify-between font-semibold">
+                <span>Amount due</span>
+                <span className="text-blue-600">{formatCurrency(newTotal)}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setStep("select_seat")}
+                disabled={isProcessing}
+              >
+                Back to Seats
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={isProcessing}
+                onClick={handleConfirm}
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2Icon className="mr-2 size-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  `Confirm & Pay ${formatCurrency(newTotal)}`
+                )}
+              </Button>
+            </div>
           </div>
         )}
       </DialogContent>
