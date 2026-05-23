@@ -113,3 +113,18 @@ src/
 ### Infrastructure fixes
 - **`middleware.ts`**: Fixed auth route paths from `/login` to `/signin`.
 - **`src/lib/supabase/booking.ts`**: Fixed RPC call from non-existent `create_booking_transaction` to `book_seat` with required params.
+
+### Task 06 — Multi-Passenger Booking
+- **`flightStore.ts`**: Changed state shape to plural arrays — `selectedSeatId` → `selectedSeatIds: string[]`, `passengerData` → `passengersData: PassengerDetails[]`, `bookingResult` → `bookingResults: BookingResult[]`. `toggleSeatSelection` adds/removes from array without auto-advancing step.
+- **`SeatMap.tsx`**: Allows selecting multiple seats up to `searchQuery.passengers` count. Clicking an unselected seat beyond the limit is ignored. Shows "N of M seats selected" counter and "Continue" button. Realtime rollback removes only the contested seat.
+- **`PassengerDetailsForm.tsx`**: Renders N bordered form sections (one per selected seat) with name, passport, nationality, DOB. All submitted at once.
+- **`CheckoutDialog.tsx`**: Lists all passengers (redacted passport), all seats with upgrade fees. Total = base × N + sum of extra fees. Calls `processMultiBooking`.
+- **`bookingActions.ts`**: New `processMultiBooking` takes flight + array of `SeatInfo`, processes payment once, creates one booking per seat via `book_seat` RPC, returns array of results.
+- **`ConfirmationView.tsx`**: Shows each ticket in its own card with PNR, passenger name, seat, fare, and aggregated price breakdown.
+- **`SearchForm` already stored `passengers` count** in `searchQuery` — used as the max seat selection limit.
+
+### Task 07 — Reschedule Enhancements
+- **`queries.ts`**: Added `searchFlightsByDate(origin, destination, date)` to filter flights by route and date.
+- **`RescheduleDialog.tsx`**: Upgraded with date picker, route-specific flight search, full color-coded seat map (section headers, legend, aisle gaps, row numbers), and a confirmation step showing flight summary + price breakdown (base fare + seat upgrade + $50 reschedule fee + amount due).
+- **`RescheduleDialog` flight filtering**: Filters out any new flights departing within 2 hours, so users can only pick eligible replacement flights.
+- **`enforce_cancellation_window` DB trigger**: Blocks cancellation/rescheduling of bookings whose original flight departs within 2 hours. Error is caught in the UI and displayed as a clear toast message rather than a raw database error.
