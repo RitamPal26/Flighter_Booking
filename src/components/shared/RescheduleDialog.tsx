@@ -77,7 +77,11 @@ export default function RescheduleDialog({
       date,
     )
     if (!error && data) {
-      setFlights(data as Flight[])
+      const now = Date.now()
+      const eligible = (data as Flight[]).filter(
+        (f) => new Date(f.departs_at).getTime() - now > 2 * 60 * 60 * 1000,
+      )
+      setFlights(eligible)
     }
     setIsLoadingFlights(false)
   }
@@ -113,7 +117,14 @@ export default function RescheduleDialog({
     const result = await rescheduleBooking(booking.id, selectedFlight.id, selectedSeat.id)
 
     if (!result.success) {
-      toast.error("Reschedule Failed", { description: result.error })
+      const msg = result.error ?? "Unknown error"
+      if (msg.includes("within 2 hours") || msg.includes("2 hours")) {
+        toast.error("Cannot reschedule", {
+          description: "Your current flight is within 2 hours of departure. Rescheduling is not permitted at this time.",
+        })
+      } else {
+        toast.error("Reschedule Failed", { description: msg })
+      }
       setIsProcessing(false)
       return
     }
