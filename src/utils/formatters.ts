@@ -1,5 +1,5 @@
 export const formatTime = (isoString: string): string => {
-  return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return new Date(isoString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' })
 }
 
 export const formatCurrency = (amount: number): string => {

@@ -126,7 +126,7 @@ export default function BookingsClient({
 
                         <p className="text-sm text-gray-500">
                           {flight
-                            ? `${formatTime(flight.departs_at)} - ${formatTime(flight.arrives_at)}`
+                            ? `${new Date(flight.departs_at).toLocaleDateString('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' })}  ${formatTime(flight.departs_at)} - ${formatTime(flight.arrives_at)}`
                             : "Flight info unavailable"}
                         </p>
                       </div>
