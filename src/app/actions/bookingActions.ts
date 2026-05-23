@@ -130,7 +130,9 @@ export async function rescheduleBooking(
     rescheduleFee,
   );
 
-  if (error) return { success: false as const, error: error.message };
+  if (error) {
+    return { success: false as const, error: error.message };
+  }
 
   return {
     success: true as const,
