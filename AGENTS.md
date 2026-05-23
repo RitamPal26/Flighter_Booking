@@ -124,7 +124,18 @@ src/
 - **`SearchForm` already stored `passengers` count** in `searchQuery` — used as the max seat selection limit.
 
 ### Task 07 — Reschedule Enhancements
-- **`queries.ts`**: Added `searchFlightsByDate(origin, destination, date)` to filter flights by route and date.
+- **`queries.ts`**: Added `searchFlightsByDate(origin, destination)` to filter flights by route using `ilike`. Date filtering is done in JS in the dialog to avoid potential Supabase timezone/date-range comparison issues.
 - **`RescheduleDialog.tsx`**: Upgraded with date picker, route-specific flight search, full color-coded seat map (section headers, legend, aisle gaps, row numbers), and a confirmation step showing flight summary + price breakdown (base fare + seat upgrade + $50 reschedule fee + amount due).
 - **`RescheduleDialog` flight filtering**: Filters out any new flights departing within 2 hours, so users can only pick eligible replacement flights.
 - **`enforce_cancellation_window` DB trigger**: Blocks cancellation/rescheduling of bookings whose original flight departs within 2 hours. Error is caught in the UI and displayed as a clear toast message rather than a raw database error.
+
+### Task 08 — Hydration Fix & Booking Date Display
+- **`formatters.ts`**: Fixed `formatTime` hydration mismatch by adding `timeZone: 'UTC'` to `toLocaleTimeString` options — server (UTC) and client (local timezone) rendered different strings causing React hydration to fail on the `/bookings` page.
+- **`BookingsClient.tsx`**: Added flight departure date display (e.g. "Jun 10, 2026  06:46 PM - 04:46 AM") to each booking card using `toLocaleDateString` with `timeZone: 'UTC'`.
+
+### Task 09 — Reschedule Dialog Fix (No Flights Found)
+- **`RescheduleDialog.tsx`**:
+  - Added `useRef` request counter (`searchReqId`) to prevent stale async responses from overwriting fresh search results (race condition fix).
+  - Added user-facing toast on API search errors via `toast.error`.
+  - Improved JS date filtering: explicit `dayStart`/`dayEnd` bounds using `new Date(\`${date}T00:00:00Z\`)`, `isNaN` guard on date parsing, and combined date + 2-hour filter.
+- **`queries.ts`**: Changed `searchFlightsByDate` from `.eq` (exact match) to `.ilike` with wildcards (consistent with `searchFlights`), and removed Supabase-side date range filtering (`gte`/`lte`) — date filtering is now done entirely in JavaScript to avoid potential timezone/format comparison issues with `timestamptz` columns.
