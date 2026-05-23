@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import ConfirmDialog from "@/components/shared/ConfirmDialog"
+import RescheduleDialog from "@/components/shared/RescheduleDialog"
 import { formatCurrency, formatTime } from "@/utils/formatters"
 import { toast } from "sonner"
 import { cancelBooking } from "@/app/actions/bookingActions"
@@ -52,6 +53,7 @@ export default function BookingsClient({
   const router = useRouter()
   const [cancelTarget, setCancelTarget] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
+  const [rescheduleTarget, setRescheduleTarget] = useState<BookingWithJoins | null>(null)
 
   const handleCancel = async () => {
     if (!cancelTarget) return
@@ -154,8 +156,7 @@ export default function BookingsClient({
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled
-                          title="Reschedule coming soon"
+                          onClick={() => setRescheduleTarget(booking)}
                         >
                           Reschedule
                         </Button>
@@ -193,6 +194,12 @@ export default function BookingsClient({
         confirmVariant="destructive"
         onConfirm={handleCancel}
         loading={cancellingId !== null}
+      />
+
+      <RescheduleDialog
+        booking={rescheduleTarget!}
+        open={!!rescheduleTarget}
+        onOpenChange={(open) => { if (!open) setRescheduleTarget(null) }}
       />
     </main>
   )

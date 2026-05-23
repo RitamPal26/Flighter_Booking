@@ -11,20 +11,26 @@ import type { Seat } from "@/types/supabase";
 export default function SeatMap() {
   const supabase = createClient();
   const selectedFlight = useFlightStore((state) => state.selectedFlight);
-  const selectedSeatId = useFlightStore((state) => state.selectedSeatId);
+  const selectedSeatIds = useFlightStore((state) => state.selectedSeatIds);
+  const toggleSeatSelection = useFlightStore((state) => state.toggleSeatSelection);
+  const searchQuery = useFlightStore((state) => state.searchQuery);
+  const setStep = useFlightStore((state) => state.setStep);
   const pendingSeatId = useFlightStore((state) => state.pendingSeatId);
-  const setSelectedSeatId = useFlightStore((state) => state.setSelectedSeatId);
   const setPendingSeatId = useFlightStore((state) => state.setPendingSeatId);
   const rollbackSeatSelection = useFlightStore((state) => state.rollbackSeatSelection);
 
   const [seats, setSeats] = useState<Seat[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const maxSeats = searchQuery?.passengers ?? 1;
+
   const handleSeatClick = (seat: Seat) => {
     if (!seat.is_available) return
+    if (pendingSeatId !== null) return
+    if (!selectedSeatIds.includes(seat.id) && selectedSeatIds.length >= maxSeats) return
     setPendingSeatId(seat.id)
     setTimeout(() => {
-      setSelectedSeatId(seat.id)
+      toggleSeatSelection(seat.id)
       setPendingSeatId(null)
     }, 400)
   }
@@ -61,8 +67,8 @@ export default function SeatMap() {
             const updated = currentSeats.map((seat) =>
               seat.id === updatedSeat.id ? updatedSeat : seat,
             )
-            if (!updatedSeat.is_available && selectedSeatId === updatedSeat.id) {
-              rollbackSeatSelection(null)
+            if (!updatedSeat.is_available && selectedSeatIds.includes(updatedSeat.id)) {
+              rollbackSeatSelection(selectedSeatIds.filter((id) => id !== updatedSeat.id))
               setPendingSeatId(null)
             }
             return updated
@@ -74,7 +80,7 @@ export default function SeatMap() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedFlight, supabase, selectedSeatId, rollbackSeatSelection, setPendingSeatId]);
+  }, [selectedFlight, supabase, selectedSeatIds, rollbackSeatSelection, setPendingSeatId]);
 
   if (!selectedFlight) return null;
   if (isLoading)
@@ -85,7 +91,7 @@ export default function SeatMap() {
   const getSeatColor = (seat: Seat) => {
     if (pendingSeatId === seat.id)
       return "bg-yellow-400 hover:bg-yellow-500 text-white animate-pulse";
-    if (selectedSeatId === seat.id)
+    if (selectedSeatIds.includes(seat.id))
       return "bg-green-500 hover:bg-green-600 text-white";
     if (!seat.is_available)
       return "bg-gray-300 text-gray-500 cursor-not-allowed opacity-50";
@@ -120,13 +126,25 @@ export default function SeatMap() {
     <Card className="w-full max-w-3xl mx-auto mt-8 border-2 border-gray-100 shadow-sm">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Select Your Seat</span>
+          <span>Select Your Seats</span>
           <span className="text-sm font-normal text-gray-500">
             Flight {selectedFlight.flight_no}
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-sm text-muted-foreground">
+            {selectedSeatIds.length} of {maxSeats} seat{maxSeats > 1 ? "s" : ""} selected
+          </p>
+          <Button
+            disabled={selectedSeatIds.length === 0}
+            onClick={() => setStep("passenger_details")}
+          >
+            Continue
+          </Button>
+        </div>
+
         <div className="flex gap-4 mb-8 text-sm justify-center flex-wrap">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 bg-purple-300 border border-purple-400 rounded"></div> First
@@ -173,7 +191,7 @@ export default function SeatMap() {
                       return (
                         <div key={seat.id} className="contents">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             disabled={!seat.is_available || pendingSeatId !== null}
                             onClick={() => handleSeatClick(seat)}
                             className={`w-11 h-11 p-0 relative group transition-all duration-200 text-xs ${getSeatColor(seat)}`}

@@ -30,7 +30,7 @@ export default function FlightDashboard() {
   const searchQuery = useFlightStore((state) => state.searchQuery);
   const setSelectedFlight = useFlightStore((state) => state.setSelectedFlight);
   const resetBooking = useFlightStore((state) => state.resetBooking);
-  const bookingResult = useFlightStore((state) => state.bookingResult);
+  const bookingResults = useFlightStore((state) => state.bookingResults);
 
   const handleSelectFlight = (flight: Flight) => {
     setSelectedFlight(flight);
@@ -40,7 +40,7 @@ export default function FlightDashboard() {
   };
 
   if (currentStep === "confirmation") {
-    if (bookingResult) {
+    if (bookingResults.length > 0) {
       return <ConfirmationView />;
     }
     return (

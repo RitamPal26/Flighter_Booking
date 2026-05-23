@@ -9,7 +9,7 @@ interface SearchQuery {
   passengers: number
 }
 
-interface PassengerDetails {
+export interface PassengerDetails {
   fullName: string
   passportNo: string
   nationality: string
@@ -27,21 +27,20 @@ interface BookingResult {
 interface FlightState {
   searchQuery: SearchQuery | null
   selectedFlight: Flight | null
-  selectedSeatId: string | null
+  selectedSeatIds: string[]
   currentStep: 'search' | 'flight_selection' | 'seat_selection' | 'passenger_details' | 'confirmation'
-  passengerData: PassengerDetails | null
-  bookingResult: BookingResult | null
+  passengersData: PassengerDetails[]
+  bookingResults: BookingResult[]
   pendingSeatId: string | null
   
-  // Actions
   setSearchQuery: (query: SearchQuery) => void
   setSelectedFlight: (flight: Flight | null) => void
-  setSelectedSeatId: (seatId: string | null) => void
+  toggleSeatSelection: (seatId: string) => void
   setStep: (step: FlightState['currentStep']) => void
-  setPassengerData: (data: PassengerDetails) => void
-  setBookingResult: (result: BookingResult) => void
+  setPassengersData: (data: PassengerDetails[]) => void
+  setBookingResults: (results: BookingResult[]) => void
   setPendingSeatId: (seatId: string | null) => void
-  rollbackSeatSelection: (previousSeatId: string | null) => void
+  rollbackSeatSelection: (previousSeatIds: string[]) => void
   resetBooking: () => void
 }
 
@@ -50,43 +49,49 @@ export const useFlightStore = create<FlightState>()(
     (set) => ({
       searchQuery: null,
       selectedFlight: null,
-      selectedSeatId: null,
+      selectedSeatIds: [],
       currentStep: 'search',
-      passengerData: null,
-      bookingResult: null,
+      passengersData: [],
+      bookingResults: [],
       pendingSeatId: null,
 
       setSearchQuery: (query) => set({ searchQuery: query, currentStep: 'flight_selection' }),
-      setSelectedFlight: (flight) => set({ selectedFlight: flight, selectedSeatId: null, currentStep: 'seat_selection' }),
-      setSelectedSeatId: (seatId) => set({ selectedSeatId: seatId, currentStep: 'passenger_details' }),
+      setSelectedFlight: (flight) => set({ selectedFlight: flight, selectedSeatIds: [], currentStep: 'seat_selection' }),
+      toggleSeatSelection: (seatId) => set((state) => {
+        const ids = state.selectedSeatIds.includes(seatId)
+          ? state.selectedSeatIds.filter((id) => id !== seatId)
+          : [...state.selectedSeatIds, seatId]
+        return { selectedSeatIds: ids }
+      }),
       setStep: (step) => set({ currentStep: step }),
-      setPassengerData: (data) => set({ passengerData: data, currentStep: 'confirmation' }),
-      setBookingResult: (result) => set({ bookingResult: result }),
+      setPassengersData: (data) => set({ passengersData: data, currentStep: 'confirmation' }),
+      setBookingResults: (results) => set({ bookingResults: results }),
       setPendingSeatId: (seatId) => set({ pendingSeatId: seatId }),
-      rollbackSeatSelection: (previousSeatId) => set({ selectedSeatId: previousSeatId, pendingSeatId: null }),
+      rollbackSeatSelection: (previousSeatIds) => set({ selectedSeatIds: previousSeatIds, pendingSeatId: null }),
       
       resetBooking: () => set({
         searchQuery: null,
         selectedFlight: null,
-        selectedSeatId: null,
+        selectedSeatIds: [],
         currentStep: 'search',
-        passengerData: null,
-        bookingResult: null,
+        passengersData: [],
+        bookingResults: [],
         pendingSeatId: null,
       }),
     }),
     {
       name: 'flight-storage',
       partialize: (state) => {
-        if (!state.passengerData) return state;
+        if (state.passengersData.length === 0) return state;
         
-        const safePassengerData = { ...state.passengerData };
-        // Redact the passport number before it hits local storage
-        safePassengerData.passportNo = ''; 
+        const safePassengersData = state.passengersData.map((p) => ({
+          ...p,
+          passportNo: '',
+        }));
         
         return {
           ...state,
-          passengerData: safePassengerData
+          passengersData: safePassengersData,
         };
       },
     }

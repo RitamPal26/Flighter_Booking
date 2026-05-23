@@ -14,53 +14,57 @@ import {
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatTime } from "@/utils/formatters"
 import { toast } from "sonner"
-import { processBooking } from "@/app/actions/bookingActions"
+import { processMultiBooking } from "@/app/actions/bookingActions"
 import PaymentForm from "./PaymentForm"
 import { Loader2Icon } from "lucide-react"
 
 export default function CheckoutDialog() {
   const selectedFlight = useFlightStore((state) => state.selectedFlight)
-  const selectedSeatId = useFlightStore((state) => state.selectedSeatId)
-  const setSelectedSeatId = useFlightStore((state) => state.setSelectedSeatId)
+  const selectedSeatIds = useFlightStore((state) => state.selectedSeatIds)
   const setStep = useFlightStore((state) => state.setStep)
-  const storeSetBookingResult = useFlightStore((state) => state.setBookingResult)
-  const passengerData = useFlightStore((state) => state.passengerData)
+  const storeSetBookingResults = useFlightStore((state) => state.setBookingResults)
+  const passengersData = useFlightStore((state) => state.passengersData)
 
-  const [seat, setSeat] = useState<Seat | null>(null)
-  const [isFetchingSeat, setIsFetchingSeat] = useState(false)
+  const [seats, setSeats] = useState<Seat[]>([])
+  const [isFetchingSeats, setIsFetchingSeats] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [completed, setCompleted] = useState(false)
 
   const isOpen = !completed
 
   useEffect(() => {
-    if (!selectedSeatId || !selectedFlight) return
+    if (!selectedSeatIds.length || !selectedFlight) return
 
-    const fetchSeat = async () => {
-      setIsFetchingSeat(true)
+    const fetchSeats = async () => {
+      setIsFetchingSeats(true)
       const { data, error } = await flightService.getCabinMap(selectedFlight.id)
       if (!error && data) {
-        const found = (data as Seat[]).find((s) => s.id === selectedSeatId)
-        setSeat(found ?? null)
+        const found = (data as Seat[]).filter((s) => selectedSeatIds.includes(s.id))
+        setSeats(found)
       }
-      setIsFetchingSeat(false)
+      setIsFetchingSeats(false)
     }
 
-    fetchSeat()
-  }, [selectedSeatId, selectedFlight])
+    fetchSeats()
+  }, [selectedSeatIds, selectedFlight])
 
   const handleConfirm = async () => {
-    if (!selectedFlight || !seat) return
+    if (!selectedFlight || !seats.length) return
 
     setIsProcessing(true)
 
-    const formData = new FormData()
-    formData.set('flightId', selectedFlight.id)
-    formData.set('seatId', seat.id)
-    formData.set('basePrice', String(selectedFlight.base_price))
-    formData.set('extraFee', String(seat.extra_fee))
+    const seatInfos = seats.map((s) => ({
+      id: s.id,
+      extraFee: s.extra_fee,
+      seatNumber: s.seat_number,
+      seatClass: s.class,
+    }))
 
-    const result = await processBooking(formData)
+    const result = await processMultiBooking(
+      selectedFlight.id,
+      selectedFlight.base_price,
+      seatInfos,
+    )
 
     if (!result.success) {
       toast.error("Payment Failed", { description: result.error })
@@ -68,30 +72,25 @@ export default function CheckoutDialog() {
       return
     }
 
-    storeSetBookingResult({
-      bookingId: result.bookingId,
-      pnrCode: result.pnrCode,
-      seatNumber: seat.seat_number,
-      seatClass: seat.class,
-      totalPrice: totalPrice,
-    })
+    storeSetBookingResults(result.results)
     setCompleted(true)
     setStep('confirmation')
     toast.success("Booking Confirmed!", {
-      description: `PNR: ${result.pnrCode}`,
+      description: `${result.results.length} booking${result.results.length > 1 ? "s" : ""} confirmed.`,
     })
   }
 
   const handleClose = () => {
     if (!isProcessing) {
-      setSelectedSeatId(null)
       setStep('passenger_details')
     }
   }
 
   if (!selectedFlight || !isOpen) return null
 
-  const totalPrice = selectedFlight.base_price + (seat?.extra_fee ?? 0)
+  const basePrice = selectedFlight.base_price
+  const totalExtraFee = seats.reduce((sum, s) => sum + s.extra_fee, 0)
+  const totalPrice = basePrice * selectedSeatIds.length + totalExtraFee
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose() }}>
@@ -99,31 +98,25 @@ export default function CheckoutDialog() {
         <DialogHeader>
           <DialogTitle>Complete Your Booking</DialogTitle>
           <DialogDescription>
-            Review your flight details and confirm payment.
+            Review your booking details and confirm payment.
           </DialogDescription>
         </DialogHeader>
 
-        {isFetchingSeat ? (
+        {isFetchingSeats ? (
           <div className="flex justify-center py-8">
             <Loader2Icon className="size-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <div className="space-y-4">
-              {passengerData && (
-                <div className="rounded-lg border bg-muted/30 p-3 space-y-1 text-sm">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Passenger</p>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Name</span>
-                    <span className="font-medium">{passengerData.fullName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Passport</span>
-                    <span className="font-medium font-mono text-xs">***{passengerData.passportNo.slice(-4)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Nationality</span>
-                    <span className="font-medium">{passengerData.nationality}</span>
-                  </div>
+              {passengersData.length > 0 && (
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Passengers</p>
+                  {passengersData.map((p, i) => (
+                    <div key={i} className="flex justify-between">
+                      <span className="text-muted-foreground">{p.fullName}</span>
+                      <span className="font-medium font-mono text-xs">***{p.passportNo.slice(-4)}</span>
+                    </div>
+                  ))}
                 </div>
               )}
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-sm">
@@ -149,19 +142,24 @@ export default function CheckoutDialog() {
                   {formatTime(selectedFlight.arrives_at)}
                 </span>
               </div>
-              {seat && (
-                <>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Seat</span>
-                    <span className="font-medium">{seat.seat_number}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Class</span>
-                    <span className="font-medium capitalize">{seat.class}</span>
-                  </div>
-                </>
+              {seats.length > 0 && (
+                <div className="border-t pt-2 space-y-1">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Seats</p>
+                  {seats.map((s, i) => (
+                    <div key={s.id} className="flex justify-between text-xs">
+                      <span>
+                        Seat {s.seat_number} &middot; <span className="capitalize">{s.class}</span>
+                      </span>
+                      {s.extra_fee > 0 && <span>+{formatCurrency(s.extra_fee)}</span>}
+                    </div>
+                  ))}
+                </div>
               )}
-              <div className="border-t pt-2 flex justify-between font-semibold">
+              <div className="border-t pt-2 flex justify-between text-xs text-muted-foreground">
+                <span>Base fare &times; {selectedSeatIds.length}</span>
+                <span>{formatCurrency(basePrice * selectedSeatIds.length)}</span>
+              </div>
+              <div className="flex justify-between font-semibold">
                 <span>Total</span>
                 <span>{formatCurrency(totalPrice)}</span>
               </div>

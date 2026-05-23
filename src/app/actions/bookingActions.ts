@@ -7,6 +7,13 @@ import {
   cancelBookingTransaction,
 } from '@/lib/services/bookingService';
 
+interface SeatInfo {
+  id: string
+  extraFee: number
+  seatNumber: string
+  seatClass: string
+}
+
 export async function processBooking(formData: FormData) {
   const flightId = formData.get('flightId') as string;
   const seatId = formData.get('seatId') as string;
@@ -33,6 +40,49 @@ export async function processBooking(formData: FormData) {
   if (error) return { success: false as const, error: error.message };
 
   return { success: true as const, bookingId: data as string, pnrCode };
+}
+
+export async function processMultiBooking(
+  flightId: string,
+  basePrice: number,
+  seats: SeatInfo[],
+) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false as const, error: 'Not authenticated' };
+
+  const totalPrice = basePrice * seats.length + seats.reduce((sum, s) => sum + s.extraFee, 0);
+
+  const paymentResult = await processPayment(totalPrice);
+  if (!paymentResult.success) return paymentResult;
+
+  const results: { bookingId: string; pnrCode: string; seatNumber: string; seatClass: string; totalPrice: number }[] = [];
+
+  for (const seat of seats) {
+    const pnrCode = `PNR${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const seatTotal = basePrice + seat.extraFee;
+    const { data, error } = await createBookingTransaction(
+      flightId,
+      seat.id,
+      user.id,
+      seatTotal,
+      pnrCode,
+    );
+
+    if (error) {
+      return { success: false as const, error: error.message };
+    }
+
+    results.push({
+      bookingId: data as string,
+      pnrCode,
+      seatNumber: seat.seatNumber,
+      seatClass: seat.seatClass,
+      totalPrice: seatTotal,
+    });
+  }
+
+  return { success: true as const, results };
 }
 
 export async function rescheduleBooking(

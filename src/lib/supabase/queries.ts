@@ -18,5 +18,13 @@ export const flightService = {
       .select('*')
       .eq('flight_id', flightId)
       .order('seat_number', { ascending: true })
+  },
+
+  async getAllFlights() {
+    const supabase = createClient()
+    return await supabase
+      .from('flights')
+      .select('*')
+      .order('departs_at', { ascending: true })
   }
 }
