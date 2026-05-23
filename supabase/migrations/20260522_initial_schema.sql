@@ -1,6 +1,5 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- 1. Tables
 CREATE TABLE IF NOT EXISTS flights (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -13,7 +12,6 @@ CREATE TABLE IF NOT EXISTS flights (
     status TEXT NOT NULL DEFAULT 'scheduled',
     base_price NUMERIC NOT NULL
 );
-
 CREATE TABLE IF NOT EXISTS seats (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     flight_id UUID REFERENCES flights(id) ON DELETE CASCADE,
@@ -23,7 +21,6 @@ CREATE TABLE IF NOT EXISTS seats (
     extra_fee NUMERIC NOT NULL DEFAULT 0,
     UNIQUE(flight_id, seat_number)
 );
-
 CREATE TABLE IF NOT EXISTS bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -34,7 +31,6 @@ CREATE TABLE IF NOT EXISTS bookings (
     total_price NUMERIC NOT NULL,
     pnr_code TEXT NOT NULL UNIQUE
 );
-
 CREATE TABLE IF NOT EXISTS passengers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
@@ -43,49 +39,48 @@ CREATE TABLE IF NOT EXISTS passengers (
     nationality TEXT NOT NULL,
     dob DATE NOT NULL
 );
-
 CREATE TABLE IF NOT EXISTS reschedules (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE,
     old_flight_id UUID REFERENCES flights(id) ON DELETE CASCADE,
     new_flight_id UUID REFERENCES flights(id) ON DELETE CASCADE,
     requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    fee_charged NUMERIC NOT NULL DEFAULT 0
+    fee_charged NUMERIC NOT NULL DEFAULT 0,
+    new_booking_id UUID REFERENCES bookings(id) ON DELETE CASCADE
 );
-
 -- 2. Row Level Security (RLS)
 ALTER TABLE flights ENABLE ROW LEVEL SECURITY;
 ALTER TABLE seats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE passengers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reschedules ENABLE ROW LEVEL SECURITY;
-
--- Public read access for flights and seats
-CREATE POLICY IF NOT EXISTS "Flights are viewable by everyone" ON flights FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Seats are viewable by everyone" ON seats FOR SELECT USING (true);
-
--- Users can only access their own bookings and related data
--- (select auth.uid()) is used instead of auth.uid() for initplan optimization —
--- it evaluates once per query rather than once per row
-CREATE POLICY IF NOT EXISTS "Users can view their own bookings" ON bookings FOR SELECT USING ((select auth.uid()) = user_id);
-CREATE POLICY IF NOT EXISTS "Users can insert their own bookings" ON bookings FOR INSERT WITH CHECK ((select auth.uid()) = user_id);
-CREATE POLICY IF NOT EXISTS "Users can update their own bookings" ON bookings FOR UPDATE USING ((select auth.uid()) = user_id);
-
-CREATE POLICY IF NOT EXISTS "Users can view their passengers" ON passengers FOR SELECT USING (
+DROP POLICY IF EXISTS "Flights are viewable by everyone" ON flights;
+CREATE POLICY "Flights are viewable by everyone" ON flights FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Seats are viewable by everyone" ON seats;
+CREATE POLICY "Seats are viewable by everyone" ON seats FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Users can view their own bookings" ON bookings;
+CREATE POLICY "Users can view their own bookings" ON bookings FOR SELECT USING ((select auth.uid()) = user_id);
+DROP POLICY IF EXISTS "Users can insert their own bookings" ON bookings;
+CREATE POLICY "Users can insert their own bookings" ON bookings FOR INSERT WITH CHECK ((select auth.uid()) = user_id);
+DROP POLICY IF EXISTS "Users can update their own bookings" ON bookings;
+CREATE POLICY "Users can update their own bookings" ON bookings FOR UPDATE USING ((select auth.uid()) = user_id);
+DROP POLICY IF EXISTS "Users can view their passengers" ON passengers;
+CREATE POLICY "Users can view their passengers" ON passengers FOR SELECT USING (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = (select auth.uid()))
 );
-CREATE POLICY IF NOT EXISTS "Users can insert passengers" ON passengers FOR INSERT WITH CHECK (
+DROP POLICY IF EXISTS "Users can insert passengers" ON passengers;
+CREATE POLICY "Users can insert passengers" ON passengers FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = passengers.booking_id AND bookings.user_id = (select auth.uid()))
 );
-
-CREATE POLICY IF NOT EXISTS "Users can view their reschedules" ON reschedules FOR SELECT USING (
+DROP POLICY IF EXISTS "Users can view their reschedules" ON reschedules;
+CREATE POLICY "Users can view their reschedules" ON reschedules FOR SELECT USING (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = (select auth.uid()))
 );
-CREATE POLICY IF NOT EXISTS "Users can insert reschedules" ON reschedules FOR INSERT WITH CHECK (
+DROP POLICY IF EXISTS "Users can insert reschedules" ON reschedules;
+CREATE POLICY "Users can insert reschedules" ON reschedules FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM bookings WHERE bookings.id = reschedules.booking_id AND bookings.user_id = (select auth.uid()))
 );
-
--- 3. RPC Function for atomic seat reservation (Prevents double-booking)
+-- 3. RPC Function for atomic seat reservation
 CREATE OR REPLACE FUNCTION book_seat(
     p_user_id UUID,
     p_flight_id UUID,
@@ -101,28 +96,20 @@ DECLARE
     v_booking_id UUID;
     v_is_available BOOLEAN;
 BEGIN
-    -- Lock the row to prevent race conditions
     SELECT is_available INTO v_is_available
-    FROM seats
+    FROM public.seats
     WHERE id = p_seat_id AND flight_id = p_flight_id
     FOR UPDATE;
-
     IF NOT FOUND OR NOT v_is_available THEN
         RAISE EXCEPTION 'Seat is no longer available.';
     END IF;
-
-    -- Mark seat as unavailable
-    UPDATE seats SET is_available = false WHERE id = p_seat_id;
-
-    -- Create booking
-    INSERT INTO bookings (user_id, flight_id, seat_id, status, total_price, pnr_code)
+    UPDATE public.seats SET is_available = false WHERE id = p_seat_id;
+    INSERT INTO public.bookings (user_id, flight_id, seat_id, status, total_price, pnr_code)
     VALUES (p_user_id, p_flight_id, p_seat_id, 'confirmed', p_total_price, p_pnr_code)
     RETURNING id INTO v_booking_id;
-
     RETURN v_booking_id;
 END;
 $$;
-
 -- RPC Function for atomic cancellation
 CREATE OR REPLACE FUNCTION cancel_booking(
     p_booking_id UUID
@@ -134,25 +121,65 @@ AS $$
 DECLARE
     v_seat_id UUID;
 BEGIN
-    -- Get seat ID and lock booking
     SELECT seat_id INTO v_seat_id
-    FROM bookings
+    FROM public.bookings
     WHERE id = p_booking_id AND user_id = auth.uid()
     FOR UPDATE;
-
     IF NOT FOUND THEN
         RAISE EXCEPTION 'Booking not found or access denied.';
     END IF;
-
-    -- Update booking status
-    UPDATE bookings SET status = 'cancelled' WHERE id = p_booking_id;
-
-    -- Free the seat
-    UPDATE seats SET is_available = true WHERE id = v_seat_id;
+    UPDATE public.bookings SET status = 'cancelled' WHERE id = p_booking_id;
+    UPDATE public.seats SET is_available = true WHERE id = v_seat_id;
 END;
 $$;
-
--- 4. DB-Level Constraint (Trigger): Prevent cancellation within 2 hours of departure
+-- RPC Function for atomic reschedule
+CREATE OR REPLACE FUNCTION reschedule_booking(
+    p_booking_id UUID,
+    p_new_flight_id UUID,
+    p_new_seat_id UUID,
+    p_user_id UUID,
+    p_new_pnr_code TEXT,
+    p_new_total_price NUMERIC,
+    p_reschedule_fee NUMERIC
+) RETURNS UUID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    v_old_seat_id UUID;
+    v_old_flight_id UUID;
+    v_new_booking_id UUID;
+    v_is_available BOOLEAN;
+BEGIN
+    SELECT seat_id, flight_id INTO v_old_seat_id, v_old_flight_id
+    FROM public.bookings
+    WHERE id = p_booking_id AND user_id = p_user_id
+    FOR UPDATE;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Booking not found or access denied.';
+    END IF;
+    SELECT is_available INTO v_is_available
+    FROM public.seats
+    WHERE id = p_new_seat_id AND flight_id = p_new_flight_id
+    FOR UPDATE;
+    IF NOT FOUND OR NOT v_is_available THEN
+        RAISE EXCEPTION 'New seat is no longer available.';
+    END IF;
+    UPDATE public.bookings
+    SET status = 'rescheduled'
+    WHERE id = p_booking_id;
+    UPDATE public.seats SET is_available = true WHERE id = v_old_seat_id;
+    UPDATE public.seats SET is_available = false WHERE id = p_new_seat_id;
+    INSERT INTO public.bookings (user_id, flight_id, seat_id, status, total_price, pnr_code)
+    VALUES (p_user_id, p_new_flight_id, p_new_seat_id, 'confirmed', p_new_total_price, p_new_pnr_code)
+    RETURNING id INTO v_new_booking_id;
+    INSERT INTO public.reschedules (booking_id, old_flight_id, new_flight_id, new_booking_id, fee_charged)
+    VALUES (p_booking_id, v_old_flight_id, p_new_flight_id, v_new_booking_id, p_reschedule_fee);
+    RETURN v_new_booking_id;
+END;
+$$;
+-- 4. Trigger: Prevent cancel/reschedule within 2 hours of departure
 CREATE OR REPLACE FUNCTION enforce_cancellation_window()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -161,9 +188,8 @@ AS $$
 DECLARE
     v_departs_at TIMESTAMPTZ;
 BEGIN
-    IF NEW.status = 'cancelled' AND OLD.status != 'cancelled' THEN
-        SELECT departs_at INTO v_departs_at FROM flights WHERE id = NEW.flight_id;
-        
+    IF NEW.status IN ('cancelled', 'rescheduled') AND OLD.status NOT IN ('cancelled', 'rescheduled') THEN
+        SELECT departs_at INTO v_departs_at FROM public.flights WHERE id = NEW.flight_id;
         IF v_departs_at <= (now() + interval '2 hours') THEN
             RAISE EXCEPTION 'Cancellations are not permitted within 2 hours of departure.';
         END IF;
@@ -171,20 +197,19 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
 DROP TRIGGER IF EXISTS check_cancellation_window ON bookings;
 CREATE TRIGGER check_cancellation_window
 BEFORE UPDATE ON bookings
 FOR EACH ROW
 EXECUTE FUNCTION enforce_cancellation_window();
-
--- 5. Restrict SECURITY DEFINER RPC execution to authenticated users only
+-- 5. Restrict RPC execution to authenticated users only
 REVOKE EXECUTE ON FUNCTION book_seat(UUID, UUID, UUID, NUMERIC, TEXT) FROM anon, public;
 REVOKE EXECUTE ON FUNCTION cancel_booking(UUID) FROM anon, public;
+REVOKE EXECUTE ON FUNCTION reschedule_booking(UUID, UUID, UUID, UUID, TEXT, NUMERIC, NUMERIC) FROM anon, public;
 GRANT EXECUTE ON FUNCTION book_seat(UUID, UUID, UUID, NUMERIC, TEXT) TO authenticated;
 GRANT EXECUTE ON FUNCTION cancel_booking(UUID) TO authenticated;
-
--- 6. Performance indexes on foreign key columns
+GRANT EXECUTE ON FUNCTION reschedule_booking(UUID, UUID, UUID, UUID, TEXT, NUMERIC, NUMERIC) TO authenticated;
+-- 6. Performance indexes
 CREATE INDEX IF NOT EXISTS idx_bookings_user_id ON bookings(user_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_flight_id ON bookings(flight_id);
 CREATE INDEX IF NOT EXISTS idx_bookings_seat_id ON bookings(seat_id);
@@ -192,4 +217,5 @@ CREATE INDEX IF NOT EXISTS idx_passengers_booking_id ON passengers(booking_id);
 CREATE INDEX IF NOT EXISTS idx_reschedules_booking_id ON reschedules(booking_id);
 CREATE INDEX IF NOT EXISTS idx_reschedules_old_flight_id ON reschedules(old_flight_id);
 CREATE INDEX IF NOT EXISTS idx_reschedules_new_flight_id ON reschedules(new_flight_id);
+CREATE INDEX IF NOT EXISTS idx_reschedules_new_booking_id ON reschedules(new_booking_id);
 CREATE INDEX IF NOT EXISTS idx_seats_flight_id ON seats(flight_id);

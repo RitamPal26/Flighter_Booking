@@ -58,6 +58,7 @@ export default function RescheduleDialog({
   const [isLoadingFlights, setIsLoadingFlights] = useState(false);
   const [isLoadingSeats, setIsLoadingSeats] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [dateRange, setDateRange] = useState({ min: "", max: "" });
   const searchReqId = useRef(0);
 
   useEffect(() => {
@@ -72,6 +73,22 @@ export default function RescheduleDialog({
     setSelectedSeat(null);
     setSeats([]);
     setFlights([]);
+    setDateRange({ min: "", max: "" });
+
+    if (booking.flights) {
+      flightService.getFlightDateRange(
+        booking.flights.origin,
+        booking.flights.destination,
+      ).then(({ data, error }) => {
+        if (!error && data) {
+          const r = data as { min_date: number; max_date: number };
+          setDateRange({
+            min: r.min_date ? new Date(r.min_date).toISOString().slice(0, 10) : "",
+            max: r.max_date ? new Date(r.max_date).toISOString().slice(0, 10) : "",
+          });
+        }
+      });
+    }
   }, [open]);
 
   const handleSearch = async () => {
@@ -222,6 +239,8 @@ export default function RescheduleDialog({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                min={dateRange.min}
+                max={dateRange.max}
                 required
               />
             </div>

@@ -43,5 +43,15 @@ export const flightService = {
       .ilike('origin', `%${origin}%`)
       .ilike('destination', `%${destination}%`)
       .order('departs_at', { ascending: true })
+  },
+
+  async getFlightDateRange(origin?: string, destination?: string) {
+    const supabase = createClient()
+    let query = supabase
+      .from('flights')
+      .select('min_date:departs_at.min(), max_date:departs_at.max()')
+    if (origin) query = query.ilike('origin', `%${origin}%`)
+    if (destination) query = query.ilike('destination', `%${destination}%`)
+    return await query.single()
   }
 }

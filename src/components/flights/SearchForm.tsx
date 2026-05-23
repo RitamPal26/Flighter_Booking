@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFlightStore } from "@/store/flightStore";
 import {
   Card,
@@ -28,6 +28,19 @@ export default function SearchForm({
   const [date, setDate] = useState("");
   const [passengers, setPassengers] = useState(1);
   const [isSearching, setIsSearching] = useState(false);
+  const [dateRange, setDateRange] = useState({ min: "", max: "" });
+
+  useEffect(() => {
+    flightService.getFlightDateRange().then(({ data, error }) => {
+      if (!error && data) {
+        const r = data as { min_date: number; max_date: number };
+        setDateRange({
+          min: r.min_date ? new Date(r.min_date).toISOString().slice(0, 10) : "",
+          max: r.max_date ? new Date(r.max_date).toISOString().slice(0, 10) : "",
+        });
+      }
+    });
+  }, []);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +111,8 @@ export default function SearchForm({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
+              min={dateRange.min}
+              max={dateRange.max}
               required
             />
           </div>
